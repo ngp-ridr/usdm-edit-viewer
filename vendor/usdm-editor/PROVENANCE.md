@@ -11,9 +11,9 @@ editor's origin at runtime: this page runs under `default-src 'none'` with
 | | |
 |---|---|
 | source | `../usdm-editor` (https://github.com/ngp-ridr/usdm-editor) |
-| commit | `081120fb77f861549be972b3fbb7f98f96ea838f` |
-| subject | The proposal downloads as .json.gz, not .zip — same bytes, a name that says what it holds, no container code of ours |
-| synced | 2026-09-13T04:37:16.548Z |
+| commit | `a6620a50910a915b3a5dcee51df4789f56f3346c` |
+| subject | verifyPackage reads clipper residue as residue: 12 of 12 example proposals re-verify clean, and the wizard stops calling its own files hand-edited |
+| synced | 2026-09-13T05:41:42.383Z |
 | files | 58 |
 
 | prefix | files |

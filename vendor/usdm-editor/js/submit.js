@@ -37,6 +37,7 @@ import { CLASSES, USDM_LABELS, USDM_COLORS } from './color.js';
 import { el, hint, saveFile } from './dom.js';
 import {
   areaKm2, tally, validateContours, validateDerivedBands, deriveBands, deriveContours, ruleContainedIn,
+  meanWidthM, RESIDUE_WIDTH_M,
 } from './topology.js';
 import { checkChangeMagnitude } from './heuristic.js';
 import { priorWeek, weekUrl } from './archive.js';
@@ -607,12 +608,41 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 
 /**
  * Re-validate a package from its own contents — the same gate, run the other
- * way round. A package that fails this was either edited by hand or produced by
- * a different version of the rules, and either way a reviewer needs to know
- * before they read the justification.
+ * way round, so a reviewer knows what the file claims before they read the
+ * prose.
+ *
+ * THE MUTUAL-CONTAINMENT CHECK IS RESIDUE-AWARE, and it has to be. The two
+ * blocks it compares are not two copies of one computation: `derivedBands` went
+ * through `deriveBands` (a difference per class, and `dropResidueParts` at the
+ * end) and comes back here through `deriveContours` (a suffix union), while
+ * `changes[].after` is the contour itself, untouched. On the nested product
+ * those two paths part company along every shared edge — the clipper's residue,
+ * the same thing `validateDerivedBands`' band-overlap rule answers — and what
+ * `deriveBands` dropped the round trip cannot put back. Measured over the ten
+ * bundled example proposals as they shipped: EIGHT failed the flat
+ * `CONTAINMENT_TOLERANCE_M2` — largest escape 0.984 km² (1.7 m wide), widest
+ * 9.1 m (0.949 km²), most of them 0.0002 km² and under a metre. A file the app
+ * had just written was being reported as hand-edited.
+ *
+ * So the reading here is the two-channel one from `RESIDUE_WIDTH_M`'s header:
+ * an escape counts as a PROBLEM only if it is over the area tolerance (which
+ * `ruleContainedIn` has already applied) AND wider than residue (50 m, mean
+ * width = 2·area/perimeter). Anything narrower is reported as `residue` — it is
+ * measured and handed back rather than hidden, so a caller can say what it
+ * agreed to within. A corrupted band (verify § 7j replaces D2 with a 1°
+ * triangle) is kilometres wide and still fails.
+ *
+ * `ruleContainedIn` itself is NOT loosened: the editor's live gate uses it as
+ * it stands, and this width reading belongs to re-checking a FILE, where both
+ * sides have already been through a derivation.
+ *
+ * @returns {{ok:boolean, problems:string[], residue:Array<{class:string,
+ *          km2:number, widthM:number, message:string}>, gates:object}}
  */
 export function verifyPackage(pkg) {
   const problems = [];
+  /* Escapes small enough to be clipper residue: not problems, not silence. */
+  const residue = [];
   /* /1 is REFUSED BY NAME rather than partially read: its `extent` block has
      no geometry, so the containment checks below would run blind, and a
      "passed" on half-checked claims is the worst answer. Nothing shipped
@@ -622,6 +652,7 @@ export function verifyPackage(pkg) {
       ok: false,
       problems: ['This file was made by an earlier version of this tool and cannot ' +
         'be checked here.'],
+      residue: [],
       gates: { contours: null, bands: null },
     };
   }
@@ -685,11 +716,11 @@ export function verifyPackage(pkg) {
     if (!contours.passed) problems.push(...contours.failures.map((f) => f.message));
 
     /* And the bands and the contour diff have to AGREE: for every edited class
-       the rebuilt contour and `changes[].after` contain each other within the
-       containment tolerance. This is the check that catches a hand-edited
-       package — either block altered alone fails it — and it is the check the
-       previous version of this comment claimed while performing only the
-       two above. */
+       the rebuilt contour and `changes[].after` contain each other — within the
+       containment tolerance, and WIDER THAN RESIDUE. This is the check that
+       catches a hand-edited package — either block altered alone fails it —
+       and the width channel is what keeps it from catching the app's own
+       output instead (see this function's header for the measurement). */
     for (const ch of Array.isArray(pkg.changes) ? pkg.changes : []) {
       const c = ch?.class;
       if (!CLASSES.includes(c) || !ch.after) continue;
@@ -697,14 +728,20 @@ export function verifyPackage(pkg) {
         innerLabel: `changes[].after (${c})`, outerLabel: `derivedBands ⇒ ${c}` });
       const b = ruleContainedIn(rebuilt[c], ch.after, {
         innerLabel: `derivedBands ⇒ ${c}`, outerLabel: `changes[].after (${c})` });
-      if (!a.ok) problems.push(a.message);
-      if (!b.ok) problems.push(b.message);
+      for (const r of [a, b]) {
+        if (r.ok) continue;
+        /* `ruleContainedIn` hands back WHERE it escaped, which is the only
+           reason the width is available without a second boolean op. */
+        const widthM = meanWidthM(r.geometry);
+        if (widthM > RESIDUE_WIDTH_M) { problems.push(r.message); continue; }
+        residue.push({ class: c, km2: areaKm2(r.geometry), widthM, message: r.message });
+      }
     }
   } else {
     problems.push('No derived bands — nothing to check.');
   }
 
-  return { ok: problems.length === 0, problems, gates: { contours, bands } };
+  return { ok: problems.length === 0, problems, residue, gates: { contours, bands } };
 }
 
 
