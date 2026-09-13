@@ -82,11 +82,11 @@ jobs:
         run: npx --prefix tools html-validate index.html
 
   # ── the comparison engine, under Node, on the app's own vendored bytes ──────
-  # No install and no browser: these modules are DOM-free by contract
-  # (docs/contracts.md § 16.4) and turf comes from the vendored UMD. The `if`
-  # on each step is scaffolding for the parallel build-out — WP-C and WP-E
-  # deliver these files, and until then the job is green and says so. Delete
-  # the conditionals once both exist; a permanently-skipping gate is not a gate.
+  # No install and no browser: every module these suites exercise is DOM-free by
+  # contract (docs/contracts.md § 16.4), and turf comes from the vendored UMD —
+  # so this job runs against PRODUCTION BYTES with nothing installed at all.
+  # It is also the fastest real signal in the workflow, which is why it is not
+  # folded into `static`: a broken comparison should not wait behind Chromium.
   engine:
     name: comparison engine
     runs-on: ubuntu-latest
@@ -105,14 +105,22 @@ jobs:
           path: tools/.cache
           key: usdm-viewer-parquet-${{ github.run_id }}
           restore-keys: usdm-viewer-parquet-
+
+      # Letters and dash patterns: unique letters across the session, the dash
+      # index cycling within an AOI, and the fifth-proposal repeat.
       - name: marks
-        run: |
-          if [ -f tools/marks.test.mjs ]; then node tools/marks.test.mjs;
-          else echo "tools/marks.test.mjs is not written yet (WP-C) — skipped"; fi
+        run: node tools/marks.test.mjs
+
+      # The magnitude grading. Ten of the twelve bundled proposals grade
+      # `residue`, so a pass/fail verdict here would call ten reference
+      # packages broken — this is the suite that keeps the two bars honest.
+      - name: re-check grading
+        run: node tools/recheck.test.mjs
+
+      # Parse, published reconstruction, regions, seams and briefs against the
+      # twelve real packages.
       - name: compare, seams and briefs
-        run: |
-          if [ -f tools/compare.test.mjs ]; then node tools/compare.test.mjs;
-          else echo "tools/compare.test.mjs is not written yet (WP-E) — skipped"; fi
+        run: node tools/compare.test.mjs
 
   # ── the day-to-day lane: every push and pull request ────────────────────────
   # --fast skips the sections that are expensive and low-signal for a change
@@ -149,9 +157,7 @@ jobs:
           key: usdm-viewer-verify-parquet-${{ github.run_id }}
           restore-keys: usdm-viewer-verify-parquet-
       - name: behavioural verification (fast lane)
-        run: |
-          if [ -f tools/verify.mjs ]; then node tools/verify.mjs --fast;
-          else echo "tools/verify.mjs is not written yet (WP-A, after integration) — skipped"; fi
+        run: node tools/verify.mjs --fast
       # A FAILING check captures its section in every lane — a fast-lane CI
       # failure with no artifact costs a rerun just to look at it.
       - uses: actions/upload-artifact@v4
@@ -190,9 +196,7 @@ jobs:
           key: usdm-viewer-verify-parquet-${{ github.run_id }}
           restore-keys: usdm-viewer-verify-parquet-
       - name: behavioural verification (full lane)
-        run: |
-          if [ -f tools/verify.mjs ]; then node tools/verify.mjs;
-          else echo "tools/verify.mjs is not written yet (WP-A, after integration) — skipped"; fi
+        run: node tools/verify.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -225,6 +229,4 @@ jobs:
           restore-keys: ${{ runner.os }}-playwright-
       - run: npx --prefix tools playwright install --with-deps chromium
       - name: axe over the app's real states
-        run: |
-          if [ -f tools/a11y-audit.mjs ]; then node tools/a11y-audit.mjs;
-          else echo "tools/a11y-audit.mjs is not written yet (WP-A, after integration) — skipped"; fi
+        run: node tools/a11y-audit.mjs
