@@ -1,0 +1,23 @@
+{
+  "week": "2026-09-08",
+  "files": [
+    "usdm-proposal-2026-09-08-state-MT-853adab3.json.gz",
+    "usdm-proposal-2026-09-08-state-MT-06e8fb67.json.gz",
+    "usdm-proposal-2026-09-08-state-WY-53bc5877.json.gz",
+    "usdm-proposal-2026-09-08-state-WY-ccbbfe2f.json.gz",
+    "usdm-proposal-2026-09-08-state-ND-8e4e4468.json.gz",
+    "usdm-proposal-2026-09-08-state-ND-2c885add.json.gz",
+    "usdm-proposal-2026-09-08-state-SD-9c26907b.json.gz",
+    "usdm-proposal-2026-09-08-state-SD-f3f094e2.json.gz",
+    "usdm-proposal-2026-09-08-state-NE-3f4c9136.json.gz",
+    "usdm-proposal-2026-09-08-state-NE-9d215f60.json.gz",
+    "usdm-proposal-2026-09-08-state-MT-4ab1b4a8.json.gz",
+    "usdm-proposal-2026-09-08-state-NE-85cf87ba.json.gz"
+  ],
+  "provenance": {
+    "source": "ngp-ridr/usdm-editor · examples/proposals/",
+    "editorCommit": "087469d4ff1d3babe8b00f67aaefd6ff16ffe080",
+    "copied": "2026-09-12",
+    "note": "Twelve usdm-edit-proposal/2 packages, byte-identical to the editor's. Fictional authors, invented indicators, real geometry. The order here is the load order, and load order is what assigns the letters: the ten original proposals first (two per state, in the editor README's table order), then the two dissents, so K and L are the ones that disagree with something already loaded. See README.md."
+  }
+}

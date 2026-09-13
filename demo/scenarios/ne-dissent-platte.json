@@ -1,0 +1,43 @@
+{
+  "aoi": "state:NE",
+  "author": {
+    "name": "Roy Steffensmeier",
+    "email": "roy.steffensmeier@example.org",
+    "affiliation": "Sixmile Canal Irrigation District",
+    "role": "Producer / land manager",
+    "onBehalfOf": "Sixmile Canal Irrigation District board of directors"
+  },
+  "edits": [
+    {
+      "verb": "degrade",
+      "polygon": [
+        [-101.00, 41.05],
+        [-100.25, 40.82],
+        [-99.70, 40.62],
+        [-99.00, 40.54],
+        [-98.78, 40.72],
+        [-98.88, 40.97],
+        [-99.60, 40.94],
+        [-100.90, 41.32]
+      ],
+      "label": "Degrade the central Platte valley by one class",
+      "rationale": "**The central Platte valley from North Platte through Gothenburg, Lexington and Kearney to Wood River is worse than the map carries, and a proposal to improve it has the rain in the wrong place.** Our district cut surface-water allocation for the third time this season on **3 September** — 100 percent to 70 percent on 2 July, to 50 percent on 8 August, to 35 percent on 3 September — and closed delivery to the lower laterals on 9 September, seventeen days early. The rain that is being offered as the case for improvement fell on the tablelands north and south of the river, not on the valley floor: our own gauge network read **0.61 in. at the Gothenburg headworks, 0.78 in. at Cozad and 0.44 in. at the Overton check** between 29 August and 8 September, against 2.5 to 3.5 inches reported from the Dawson and Buffalo county uplands ten to fifteen miles off the river. Platte base flow at Brady and Overton did come up, and it came up because we and three other districts stopped diverting, which is not a hydrologic recovery. Canal shortfall for the season stands at **31 percent of contracted deliveries**, the worst since 2012; pivot hours on district groundwater ran 40 percent above the ten-year mean in August; and the alluvial observation wells at Lexington and Elm Creek are 4 to 6 feet below their September median and still falling. Take the class the other way, not off. The ground in this strip is carried at D2 on the west end, D1 through the middle and D0 east of Kearney, and every one of those is a class better than what the valley has been running on since the first week of August."
+    }
+  ],
+  "narrative": "We are the board and staff of an irrigation district on the central Platte, and we are filing against a proposal that would improve the class along the valley floor from North Platte to Wood River. We think that proposal is right about the rain and wrong about where it fell, and we think the streamflow it cites is our water, not the river's.\n\nThe first-week-of-September system was a tableland event in our country. Our own gauges on the canal system read 0.44 to 0.78 inches at the Overton check, the Gothenburg headworks and Cozad between 29 August and 8 September. Ten to fifteen miles off the river, on the Dawson and Buffalo county uplands, the same storms are reported at 2.5 to 3.5 inches. Both numbers can be true and only one of them describes the valley floor, which is the ground the polygon in question covers. A radar-derived or a gridded 30-day product will smear the upland totals across the valley; a network of canal rain gauges sitting on the ground being classified will not.\n\nThe streamflow argument has the same problem in a sharper form. Platte base flow at Brady, Overton and Grand Island did climb off its late-summer minimum in the first ten days of September. It climbed because our district cut to 35 percent on 3 September and closed the lower laterals on 9 September, and because three neighbouring districts made comparable cuts in the same week. A river that comes up because the diversions came off is not a river that has recovered; reading it as recovery and then using it to improve the class is circular, and it is the specific reason an operating district ought to be in this conversation.\n\nWhat the season actually looks like from the ditch: three allocation cuts, delivery closed seventeen days early, season shortfall at 31 percent of contracted acre-feet, August pivot hours 40 percent above the ten-year mean, and alluvial observation wells at Lexington and Elm Creek four to six feet under their September median and still falling. Second and third cuttings on district hay ground came in short, and a meaningful share of our corn acres were cut for silage in the last week of August rather than carried to grain. That is a valley getting worse through September, not better. We ask for a one-class degradation along the strip — D2 to D3 on the west end, D1 to D2 through the middle, D0 to D1 east of Kearney — and we are content for the tablelands to be left exactly as they are, because on the tablelands the improvement proposal is describing something real.",
+  "impacts": "The 2026 season ends for this district on 9 September, seventeen days early and at 35 percent of contracted allocation, and the effect lands almost entirely on groundwater. Every acre still under a pivot in the last three weeks of the season came off district wells at August and September power rates, and pumping cost per acre-foot on the system is running well above the budget the board set in March. Members with surface-only ground took the shortfall directly: second and third cuttings on the district's hay acres came in short, and a substantial share of corn in the lower service area was cut for silage in the last week of August rather than carried to grain, which is a decision nobody makes in a year that is improving.\n\nGoing into the winter the concern is carryover and the 2027 allocation. Alluvial water levels at Lexington and Elm Creek are four to six feet below their September median and have not turned; the recharge our system usually gets from late-season delivery did not happen because there was no late-season delivery. If the published map carries this valley as improving, the district's members will be reading a class that does not match the notices on their headgates, and the programmes that key off the map will be reading it the same way.",
+  "evidence": [
+    {
+      "url": "https://waterdata.usgs.gov/nwis/rt",
+      "label": "USGS real-time streamflow, Platte River at Brady, Overton and Grand Island"
+    },
+    {
+      "url": "https://hprcc.unl.edu/maps.php?map=ACISClimateMaps",
+      "label": "High Plains Regional Climate Center — 14- and 30-day precipitation, station values not gridded"
+    },
+    {
+      "url": "https://dnr.nebraska.gov/surface-water",
+      "label": "Nebraska DNR surface-water administration — allocation and closing notices, central Platte districts"
+    }
+  ]
+}

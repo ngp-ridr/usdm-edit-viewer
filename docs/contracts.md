@@ -161,6 +161,26 @@ patchesTouching(p, geometry, bbox) → patch[]
 Anchor-in-piece first (cheap and usually right), then bbox overlap +
 `booleanIntersects`. Used to attribute a region to the patches that produced it.
 
+### The change map (WP-B)
+
+```js
+changeMap(p) → { deltas: {'-5'…'5'}, nonzero: string[] }   // memoized on p
+worstDeltaFor(p, patch) → { delta, step, label } | null
+```
+
+NDMC's own ordinal arithmetic, through the vendored `js/delta.js`
+(`deriveChangeMap` / `worstDeltaWithin`), so "a 2-class degradation" on a change
+card is the same sentence the editor wrote. The working side is `p.contours` —
+`deriveContours` over the shipped bands, which is what `changes[].after` carries
+for an edited class and what the published contour is for an untouched one,
+computed one way rather than stitched from two. **Lazy**: two partitions and
+thirty intersections, and no card needs it until one is opened.
+
+`Proposal.source` is the url the FILE was loaded from, or `null` for a picked or
+dropped one. **Never `pkg.baseline.source`** — that is the archive parquet, it
+stays under `baseline`, and the session line's "a link will open empty" sentence
+reads this field.
+
 ### `checkIntegrity(p) → { grade, problems[], largestKm2, escapedKm2 }`
 
 Re-runs `verifyPackage`'s mutual-containment loop (vendored
@@ -184,7 +204,23 @@ were "hand-edited or produced by a different version" would be worse than no
 tool. Only a `'defect'` shows the verifier's own sentence.
 
 `verifyPackage` is also run for its NON-containment problems (it imports cleanly
-under Node — `dom.js` touches `document` only inside functions).
+under Node — `dom.js` touches `document` only inside functions). Since the
+re-sync from editor `a6620a5` it returns `{ok, problems, residue, gates}` and has
+applied the WIDTH channel itself, so a residue-scale escape arrives in `residue`
+rather than `problems`; the area bar above is still applied here.
+
+**Where the bar lives (WP-D and WP-E, agreed):** § 11 calls `js/recheck.js` "a
+thin wrapper over `checkIntegrity`" and it is written **the other way round** —
+`recheckPackage` holds the one copy of the magnitude bar, the residue/defect
+split and the sentence, and `checkIntegrity` is the § 2 façade over it. Two
+copies of a measured threshold drift, and the one that drifts is always the one
+nobody is looking at. The § 2 SHAPE above is unchanged; `recheckPackage`'s richer
+fields (`residue`, `residueKm2`, `residueWidestM`, `ok`, `sentence`, `gates`) are
+carried alongside rather than thrown away.
+
+`heuristic` is kept on the Proposal minus its `samples` (WP-D): the card renders
+the verdict's sentence and can zoom to its `geometry`, and the sample lattice is
+the only part worth dropping.
 
 ---
 
@@ -307,10 +343,28 @@ analyseSeam(sideA, sideB, line, { provider }) → Seam | null
 findSeams(session, { provider, neighbors }) → Promise<Seam[]>
 ```
 
-`sharedLine` bbox-clips both rings to the padded bbox overlap, `polygonToLine`s
-them, and `lineOverlap`s at `SEAM_TOLERANCE_KM`. TopoJSON shared arcs coincide
-exactly, so this is exact and cheap: the SD/NE line is 489 km in 14 ms. **Clip
-with `envelopeOf(indexParts(aoi))`, not `aoi.bbox`** — the Alaska rule.
+`sharedLine` keeps the segments of A's boundary that **run within
+`SEAM_TOLERANCE_KM` of B's**, over a cell index of B's segments with an
+equirectangular point-to-segment distance. Symmetric by construction: measured
+A-side against B-side over all ten demo AOI pairs, the two agree to 0.1 km.
+1–10 ms per pair. **Test bbox overlap with `envelopeOf(indexParts(aoi))`, not
+`aoi.bbox`** — the Alaska rule.
+
+> **This replaces the clip-then-`lineOverlap` written here at the freeze, and
+> both halves of that were measured wrong on this corpus (WP-E).** THE CLIP
+> INVENTS SHARED LINE: clipping two AOIs to their envelope overlap closes each
+> along the same four rectangle edges, and Montana's artificial edge at
+> −111.07° *is* Wyoming's western state line for 72 km — the two then "share" a
+> border along Idaho. Clipping turned MT/WY into 279.0 km against a true 608.6,
+> and NE/SD into 681.5 km against 109.9 for the same call unclipped. And
+> `lineOverlap` IS ARGUMENT-ORDER DEPENDENT and non-monotonic in its tolerance,
+> because it walks the second line's segments against an index of the first:
+> NE/SD came back 572.1 km with South Dakota first and 109.9 km with Nebraska
+> first, both at 50 m, and 681.5 km at a tolerance of zero. (The vendored
+> js/changes.js knows this — its edge-effect note says the patch outline must
+> go first — but there the operands are a short fragment and a long line, and
+> here neither is.) The SD/NE line is **681.5 km**, not the 489 km measured
+> during planning.
 
 A **side**:
 
@@ -340,17 +394,21 @@ indeterminate sample splits a run and is never bridged.** Each sample carries
 `classA, classB, publishedA, publishedB`.
 
 Sampling rather than exact buffers is a deliberate choice with a measurement
-behind it: 0 indeterminate samples at 1 km over the SD/NE line (which clears
-both the FSA boundary's ~40 m zigzag and the editor's 0.5 km
-`NEIGHBOR_BUFFER_KM`), whole-mile reporting, and no boolean ops at all.
+behind it: **1 indeterminate sample in 341** at a 1 km offset over the SD/NE
+line (which clears both the FSA boundary's ~40 m zigzag and the editor's 0.5 km
+`NEIGHBOR_BUFFER_KM`), whole-mile reporting, and no boolean ops at all. A
+sample whose class comes back `null` on either side is indeterminate for the
+same reason a side-less one is: `null` means "outside that working area", which
+is not an answer about this border.
 
 ```js
 Run {
   classA, classB, publishedA, publishedB,
   step,            // ord(classB) − ord(classA)
   publishedStep,   // ord(publishedB) − ord(publishedA)
-  kind,            // 'agree' | 'new' | 'widened' | 'pre-existing' | 'narrowed'
+  kind,            // 'agree' | 'new' | 'widened' | 'pre-existing' | 'narrowed' | 'unknown'
   lengthKm, from, to, midpoint,
+  geometry,        // LineString — THIS RUN'S OWN STRETCH OF THE BORDER
   changedBy,       // 'A' | 'B' | 'both' | 'neither'
 }
 ```
@@ -361,6 +419,23 @@ Run {
 - equal → `pre-existing` — kept in `runs`, **excluded from findings**;
 - smaller → `narrowed`.
 
+**`geometry` carries every vertex of the border between the run's ends, never
+the `from`→`to` chord** (WP-C). A jurisdiction line is not straight — the
+Missouri carries the SD/NE border for 200 km — and `seams-casing` draws a `new`
+run with a 5 px white casing under it: on a chord that casing lies in the wrong
+state. Consecutive runs meet, because each end is extended half a sample's
+share of the line.
+
+**`'unknown'` is a sixth kind**, for a far side the published week could not be
+read for: § 6 says the seam is still emitted, so its runs carry what side A
+says with `classB`, `step` and `publishedStep` all `null`. It is excluded from
+findings exactly as `pre-existing` is.
+
+`lengthKm` is the sum of its samples' equal shares of their own line string, so
+**the runs of a line add up to the line** — a flat `SEAM_SPACING_KM` per sample
+is close enough on a 680 km border and badly wrong on an edge effect's
+fragments, where eleven pieces totalling 5.4 km would each claim 2 km.
+
 ```js
 Seam {
   id,            // 'seam:<8 hex>' — § 8
@@ -368,6 +443,7 @@ Seam {
   kind: 'seam',
   sideA, sideB, neighbourId,
   runs: Run[], lengthKm, newStepKm, maxStep,
+  geometry,      // MultiLineString — THE LINE THE SEAM WAS ANALYSED OVER
   reciprocal,    // true when BOTH sides carry a proposal
   isNew,         // any run of kind 'new'
   edgeEffects,   // the matching edgeEffects rows from either side
@@ -377,8 +453,30 @@ Seam {
 }
 ```
 
+`Seam.geometry` (WP-C) is `sharedLine`'s result where both sides are loaded and
+the union of the loaded side's `edgeEffects[].segments` where the neighbour is
+not — so the map draws the seam itself rather than a box around it. It is also
+exposed as `line`, which is the name js/seams.js's own functions read it under.
+
 Rank: reciprocal-with-disagreement first → `maxStep` descending → `newStepKm`
-descending → `id`.
+descending → `id`. "Reciprocal-with-disagreement" is a seam carrying a
+reportable run whose `changedBy` is `'both'`: both authors looked at this
+border, both said something, and the two still do not line up.
+
+### Seams against regions (WP-B)
+
+```js
+rankFindings(regions, seams) → findings[]      // js/session.js
+```
+
+**The one ranked list is a CONCATENATION** — conflicts, then one-sided, then
+seams, each in its own total order — and that is a decision, not a default. The
+three kinds are not commensurable: a seam has no area and its size is a LENGTH,
+so a merged rank by `areaKm2` puts every seam last and a merged rank by class
+step puts a two-class seam above every one-class conflict in the set. Either
+way the finding a reconciliation meeting exists to settle gets buried. It is
+also the order of the drawer's three `<details>` groups, so the list and its
+text twin cannot disagree.
 
 ---
 
@@ -658,14 +756,35 @@ them, and the letter is the text twin of the dash. Recorded in `CLAUDE.md`.
 ### js/panels.js
 
 ```js
-createPanels(els, ctx) → {
+createPanels(els, ctx, handlers?) → {
   renderSession(summary),        // #session-line
   renderProposals(proposals),    // #proposal-list, grouped by working area
   renderFindings(findings),      // #findings-section
   renderLegend(view),            // #legend-section
   setStatus(sentence),           // #findings-status, role=status
+  setSelection(selection),       // the selected row's aria-current
+  repaintDimming(),              // one class per row, no rebuild
+  destroy(),                     // cancels the deferred re-check queue
 }
+
+handlers = { onToggleShown(ids), onOpenProposal(p), onOpenFinding(f) }
 ```
+
+**Three additions to the frozen surface, and one optional argument (WP-D).**
+`handlers` is how js/app.js wires the drawer's three verbs explicitly; each falls
+back to `ctx` (`setShown`, `openProposal`, `select`) when it is absent, so the
+two-argument call above still works unchanged. `setSelection` and
+`repaintDimming` exist because neither is a render: a selection moving and a
+checkbox moving each change ONE attribute per row, and rebuilding forty rows to
+move one `aria-current` would throw away the reader's scroll position and their
+keyboard place with it.
+
+**The re-check verdict is DEFERRED, one proposal per `setTimeout(0)`.** Reading
+`p.integrity` costs 106–663 ms per package (measured over the twelve bundled
+ones), so touching twelve of them inside `renderProposals` would freeze the
+drawer for seconds at the moment a reader is looking at it. Rows render at once
+with a "checking…" line and a queue fills them in; a re-render cancels it. Not
+`requestIdleCallback` — Safari does not have it, and this app is public.
 
 Everything is built with `el()` from the vendored `js/dom.js` — **which throws on
 a `style` attribute**, and that is the point. Swatch colours are CSSOM writes
@@ -688,8 +807,17 @@ where, what, size. Arrow keys rove within a group; Enter opens.
 ### js/cards.js
 
 ```js
-createCards(els, ctx) → { showProposal(p), showChange(p, patchKey), showFinding(f), showSeam(s) }
+createCards(els, ctx, handlers?) → { showProposal(p), showChange(p, patchKey),
+                                     showFinding(f), showSeam(s), showing() }
+
+handlers = { onZoom(target), onOpenFinding(f) }
 ```
+
+Same optional third argument, for the same reason: a "Zoom" button on a card and
+a cross-link to another finding are the two verbs the list and the map already
+have, and they go to the same two functions rather than to a second pair.
+`showFinding` accepts a seam and forwards it, so a caller holding a mixed ranked
+list never has to ask which kind it has.
 
 Prose goes through the vendored `renderMarkdown` (`js/mdtext.js`) — a sanitized
 `DocumentFragment`; Squire is lazy and `.catch`-guarded and a read-only render
@@ -711,24 +839,68 @@ The card opens with focus and Escape returns focus to the opener (the kit's
 ### js/recheck.js (DOM-free)
 
 ```js
-recheckPackage(pkg) → { grade: 'pass'|'residue'|'defect', problems: [], largestKm2, sentence }
+recheckPackage(pkg) → { grade: 'pass'|'residue'|'defect', ok, problems: [],
+                        residue: [], largestKm2, residueKm2, residueWidestM,
+                        sentence }
+normalizeRecheck(either shape) → the shape above
+recheckSentence(result) → string          // § 15
+containmentEscapes(pkg) → escape[]        // with GEOMETRY
+gradeEscape(km2, widthM) → 'ignore'|'residue'|'defect'
 ```
 
-A thin wrapper over `checkIntegrity` (§ 2) plus `verifyPackage`'s non-containment
-problems. `sentence` is the author-facing line (§ 15) — and for `residue` it says
-"agrees to within N mi² along shared edges", never "hand-edited".
+`sentence` is the author-facing line (§ 15) — and for `residue` it says "agrees
+to within N mi² along shared edges", never "hand-edited".
+
+**`problems` and `residue` are two lists, not one (WP-D).** A problem is
+`{ message, class, areaKm2, widthM, geometry }` — an OBJECT, always, so a caller
+never has to ask which shape it got, and `geometry` is what the card's "Show me"
+needs. Residue is not a problem and must not be counted as one: ten of the twelve
+bundled proposals grade `residue`, and a panel that reported "10 problems" over
+ten slivers would be the exact failure this grading exists to prevent.
+
+**The grading implementation lives HERE, and `normalizeRecheck` is the seam.**
+§ 2's `checkIntegrity` grades too, with the same bars and a different shape (one
+`problems` list with a `grade` on every row, plus `escapedKm2`). The drawer reads
+whichever it is handed through `normalizeRecheck`, so the sentence and the split
+are written once. Two copies of a magnitude bar drift.
+
+**It works against both copies of `verifyPackage`.** A `residue` field on the
+result is used when it is there (the re-synced copy has already applied the width
+channel, and a clean file then costs no geometry work at all); the
+mutual-containment loop is re-run here whenever there is a containment problem to
+attach geometry to, or whenever the copy has no `residue` field. When it is
+re-run its answer is authoritative, so nothing is counted twice.
 
 ### js/export.js
 
 ```js
 {
-  downloadBrief(finding, { viewerUrl }),      // saveFile() from the vendored js/dom.js
-  copyBrief(finding, { viewerUrl }),          // clipboard, then ONE toast
-  downloadSessionBrief(),
-  briefFilename(finding) → string,            // 'usdm-brief-2026-09-08-MT-conflict-1a2b3c4d.md'
-  linkTo(finding) → string,                   // absolute url with ?focus=
+  downloadBrief(finding, opts) → filename|null,   // saveFile() from the vendored js/dom.js
+  copyBrief(finding, opts) → Promise<boolean>,    // clipboard, then ONE toast
+  downloadSessionBrief(opts) → filename|null,
+  briefFilename(finding, { week }) → string,  // 'usdm-brief-2026-09-08-MT-conflict-1a2b3c4d.md'
+  sessionBriefFilename({ week }) → string,    // 'usdm-briefs-2026-09-08.md'
+  linkTo(finding, { viewerUrl, url }) → string,   // absolute url with ?focus=
 }
+
+opts = { ctx, markdown?, brief?, week?, say? }
 ```
+
+**The markdown comes from the caller, never from this module (WP-D).** It is
+`opts.markdown`, else `opts.brief(finding)`, else `ctx.brief(finding)` — this
+module knows how a string becomes a download, a clipboard entry and a url, and
+nothing about how a brief is written. `week` is `opts.week ?? ctx.week`: a
+finding carries no week and the filename leads with one.
+
+**`linkTo` preserves the address the reader is at** and replaces only `focus`.
+There is no Share button in this app because the address bar is the share, so a
+brief that linked back to a default view would drop its reader somewhere they
+have never been.
+
+**The clipboard's failure path downloads instead**, with one sentence saying so.
+The reader asked for the text out of the browser; an insecure origin or a refused
+permission is not a reason to answer with an apology, and two toasts in one turn
+means the first was never read.
 
 ---
 
@@ -750,7 +922,7 @@ ctx = Object.freeze({
   get seams(),                   // Seam[]
   get view(),                    // 'proposal' | 'published' | 'differences'
   get pick(),                    // Proposal | null
-  get shown(),                   // Set<proposalId>
+  get shown(),                   // Set<proposalId> — EMPTY MEANS ALL, see below
   get selection(),               // { kind, id } | null
   get viewerUrl(),               // location.origin + location.pathname
 
@@ -761,22 +933,69 @@ ctx = Object.freeze({
   note(sentence, { error }),     // #app-note
   markFor(proposalId), proposalById(id), findingById(id),
   brief(finding) → string,
+  sessionBrief() → string,       // every finding in one document
+  worstDeltaFor(p, patch),       // § 2's change map, for a change card
+  openFinding(f), openProposal(p),   // aliases for select(), by name
+  get cards(), get card(), get drawer(), get map(), get mapView(),
+  get layers(), get els(), fitPadding(base), pushState(),
 })
 ```
+
+**An empty `shown` set means EVERY loaded proposal (WP-B).** It is not "none",
+and no caller may read it as a list to filter by without checking its size
+first — `js/map.js`'s `setShown` and `js/panels.js`'s `isShown` both take the
+same reading, and `ctx.setShown` normalises a set naming everything back to the
+empty one. The alternative, holding the full list, makes the DEFAULT a thing that
+has to be rewritten on every load and re-derived on every comparison; and it
+would put twelve shortIds in the address bar of a session nobody has narrowed,
+where § 14 says a view at defaults emits nothing at all.
+
+**The `summary` object `renderSession` is handed (WP-B and WP-D):**
+
+```js
+{
+  week,                  // 'YYYY-MM-DD' | null
+  proposals,             // the ARRAY, not a count — panels counts it itself
+  findings,              // the ARRAY, likewise; panels counts the three kinds
+  count, areas,          // numbers, for a caller that wants them without a pass
+  conflicts, oneSided, seams,   // numbers
+  local,                 // did ANY of this come off this computer?
+  localNote,             // the sentence for that, or null
+  sentence,              // the § 15 findings sentence, for the empty case
+}
+```
+
+`proposals` and `findings` are arrays because `renderSession` falls back to
+`ctx` when it is handed nothing, and a number in those fields reads as "nothing
+is loaded". `local` is STICKY and comes from the `LoadReport`, not from
+`Proposal.source` — a session that mixes a `?load=` url with a dropped file
+still cannot travel in a link, and the sentence has to say so.
 
 The verification hook, for `tools/verify.mjs` and nothing else:
 
 ```js
 window.__viewer = Object.freeze({
   get booted(),       // boot() ran all the way to the end
+  get passes(),       // FINISHED recompute passes — the settled signal
   get session(),
   get findings(),
   get seams(),
   get view(),
   ctx: () => ctx,
-  get lastCompareMs(), get lastPunchMs(),
+  get lastCompareMs(), get lastPunchMs(), get lastDeriveMs(),
+  get basemapDegraded(),
 })
 ```
+
+**Wait on `passes`, never on `findings.length` (WP-B).** `booted` is set once,
+and everything a load produces — the drawer's session line, the legend, the
+map's findings, the URL — is written at the END of the recompute pass, after the
+findings array has already filled. A harness waiting on the array therefore
+races the paint it is about to assert on. `passes` goes up last.
+
+`basemapDegraded` says whether `resolveBaseStyle()` fell back to the blank
+ground: a degraded boot and a slow one are indistinguishable from outside
+without it.
 
 Exposed unconditionally, for the editor's reason: a debug path that only exists
 under test is a debug path nobody has tested, and this app has no credentials and

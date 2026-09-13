@@ -1,0 +1,53 @@
+{
+  "aoi": "state:MT",
+  "author": {
+    "name": "Wade Ostrander",
+    "email": "wade.ostrander@example.org",
+    "affiliation": "Office of the State Climatologist",
+    "role": "State climatologist"
+  },
+  "edits": [
+    {
+      "verb": "improve",
+      "polygon": [
+        [-107.55, 48.32],
+        [-106.80, 48.22],
+        [-106.35, 48.40],
+        [-106.32, 48.92],
+        [-106.95, 49.05],
+        [-107.55, 49.02]
+      ],
+      "label": "Improve the Milk River Hi-Line off D0",
+      "rationale": "**Milk River Hi-Line, Malta east to Glasgow — this reads better, not worse.** We have seen the case for taking this block to D1 and we read the same stations the other way. The 2 to 3 inches that fell between 24 August and 6 September landed on the Milk River bottoms and on the benches north of the river, not on the country south of it: Malta 2.41 in., Saco 2.68 in., Hinsdale 2.15 in. and Glasgow 2.90 in., between **190 and 240 percent of normal for the period**. That is enough to carry 30-day SPI at Malta and Glasgow to **+0.8 to +1.1**, and it is why the 90-day figures quoted against this ground — genuinely −1.2 to −1.5 as of the last week of July — no longer describe the profile anyone is farming or grazing on. Top-foot soil moisture at the Malta and Glasgow monitoring sites came back to the seasonal median inside eight days of the 29 August rain and has held there. The Milk below Vandalia is low, as it is every September after the project's season ends, and the diversion call was a scheduling matter rather than a hydrologic one. The stock-water complaints that have been offered in support of a Hi-Line degradation are from the Breaks **south** of the river, which this proposal does not touch. Drought-free is the honest class for the valley and the benches: D0 here is a holdover from mid-August."
+    },
+    {
+      "verb": "improve",
+      "polygon": [
+        [-107.20, 44.92],
+        [-105.10, 44.92],
+        [-105.05, 45.55],
+        [-105.60, 45.82],
+        [-106.60, 45.80],
+        [-107.25, 45.45]
+      ],
+      "label": "Improve the Powder River country by one class",
+      "rationale": "**Powder River and Big Horn counties — Broadus, Decker, Birney, north to the Tongue.** The convective line of 30–31 August ran up the Powder and the Tongue and gave Broadus 1.97 in., Birney 2.30 in., Decker 1.74 in. and Moorhead 2.05 in.; 30-day totals across the block are **150 to 185 percent of normal** and the 60-day SPI has come up from about −1.6 to −0.5. The Powder River at Moorhead and the Tongue below the reservoir have both risen off their late-summer minima to the **30th to 40th percentile** for the date, and stock reservoirs on the Otter Creek and Hanging Woman drainages took their first meaningful inflow since June. Range transects on the Custer National Forest's Ashland district picked up measurable September regrowth for the first time in two years. A one-class improvement — D2 to D1 over most of this block, D3 to D2 on its eastern margin — is what the indicators support. **We note the seam deliberately.** A proposal now in front of the authors for Wyoming carries the Sheridan–Clearmont corridor from D2 to D3 up to this same state line. The Wyoming case rests on the Goose Creek and lower Tongue gages above the confluence, which did miss the 30 August cells; the Montana side of the line did not. If both proposals were accepted as drawn the map would carry a two-class step across a surveyed line in country where the range, the gages and the rain gauges are continuous, and that is a signal about whose office drew which polygon, not about the ground. We would rather be argued out of this than have the step drawn."
+    }
+  ],
+  "narrative": "This office reads the same week as the two deterioration proposals now in front of the authors for northeastern and southeastern Montana, and we come to the opposite conclusion on the ground they cover. We ask for a one-class improvement in two places: the Milk River Hi-Line from Malta east to Glasgow, and the Powder River country of Powder River and Big Horn counties south to the Wyoming line. We are not contesting the severe core in the east-central part of the state, and we are not asking for a wholesale revision of the week. We are asking that two blocks whose indicators turned in the last ten days of August stop being carried at the intensity they had in mid-August.\n\nThe Hi-Line case is a rain-timing case. The 29 August–6 September system was a valley event: Malta, Saco, Hinsdale and Glasgow took 2.1 to 2.9 inches, 190 to 240 percent of normal for the period, and 30-day SPI along the river is now positive. The argument for degrading this block cites 60- and 90-day precipitation and 90-day SPI, which are real numbers and which are also, at this point in the season, a description of July. The USDM is a depiction of current conditions with a memory, not a running total; when the top foot of soil at Malta and Glasgow is back to median and has held there for two weeks, D0 on the valley floor and the benches north of the river is a class the profile no longer earns. The Breaks south of the Milk, where the stock-water hauling and the dry pits genuinely are, are outside this proposal's polygons and are not what we are disputing.\n\nThe Powder River case is the same shape, with a second problem attached. The 30–31 August line gave Broadus, Birney, Decker and Moorhead 1.7 to 2.3 inches, the Powder at Moorhead and the Tongue have both come off their minima, and September regrowth is measurable on the Ashland district for the first time in two seasons. A one-class improvement follows from that. What makes it urgent is the seam: a Wyoming proposal takes the Sheridan–Clearmont corridor to D3 up to the same line. Accept both as drawn and the published map carries a two-class step across the 45th parallel through country that is hydrologically and agriculturally continuous. Border discontinuities are the one artefact this process exists to catch, and catching it means the two offices reconciling before the map goes out, not after.\n\nWe recognise that this is a dissent and we have written it as one. If the authors sustain the deterioration in either block we would ask that the decision be recorded against the specific indicator set it rests on, so that a producer in Phillips County or in Powder River County can see which numbers carried the week.",
+  "impacts": "The practical stakes differ between the two blocks. On the Hi-Line the class matters mostly for programme eligibility and for the signal it sends into the fall: an operator deciding whether to buy hay or to run cows on the benches into late October is reading the map as much as the forecast, and carrying D0 through a two-inch rain teaches people to stop reading it. Winter wheat seeding in Phillips and Valley counties went in the first week of September on a workable profile, which is the first time in three seasons it has, and the seedbed moisture reports from the Malta and Glasgow area reflect that.\n\nIn the Powder River country the improvement is real but modest and nobody there is calling the year good: stock reservoirs took inflow for the first time since June and are still well below their September medians, hay bought in from west of the Divide is still moving east on freight, and a share of the 2026 calf crop has already been sold early. The September rain changed the trajectory rather than the balance. What we are asking for is a class that matches that trajectory, and a state line that does not put neighbours two classes apart because they filed with different offices.",
+  "evidence": [
+    {
+      "url": "https://hprcc.unl.edu/maps.php?map=ACISClimateMaps",
+      "label": "High Plains Regional Climate Center — 30-day precipitation and percent of normal, 8 September"
+    },
+    {
+      "url": "https://waterdata.usgs.gov/mt/nwis/current/?type=flow",
+      "label": "USGS current streamflow and percentile-of-record, Milk, Powder and Tongue River gages"
+    },
+    {
+      "url": "https://www.drought.gov/states/montana",
+      "label": "Drought.gov — Montana indicator dashboard, short-term and long-term blends"
+    }
+  ]
+}
