@@ -68,6 +68,37 @@ export function surnameOf(author) {
   return parts[parts.length - 1];
 }
 
+/**
+ * An author's whole name, or what stands in for one.
+ *
+ * A package with an empty `author.name` is a real package — the editor's own
+ * gate reports it as incomplete rather than refusing to write it — and every
+ * surface that prints a name has to answer for that case in words. "B · " with
+ * nothing after it reads as a rendering bug.
+ *
+ * @param {object} author the `author` block
+ * @param {boolean} [lead] true when the phrase starts a sentence or a label
+ */
+export function authorName(author, lead = false) {
+  const name = String(author?.name ?? '').trim();
+  if (name) return name;
+  return lead ? 'An unnamed author' : 'an unnamed author';
+}
+
+/**
+ * A role, as a reader reads it.
+ *
+ * The editor's role list ends in "Other", which is an answer in a form and a
+ * non-answer in a sentence: "Nebraska · Other" tells a reviewer nothing about
+ * who wrote the proposal. The blank and the literal are the same fact, and both
+ * say so.
+ */
+export function roleWord(role) {
+  const r = String(role ?? '').trim();
+  if (!r || r.toLowerCase() === 'other') return 'Role not given';
+  return r;
+}
+
 /** `['Change 2', 'Change 3']` → `'Changes 2 and 3'`; `[]` → `'no change'`. */
 function changeRef(names) {
   if (!names.length) return 'no change';
@@ -126,7 +157,9 @@ function isShown(ctx, id) {
  *        and `week` are read; `setShown`, `select`, `focus` and `say` are
  *        called.
  * @param {{onToggleShown?:Function, onOpenProposal?:Function,
- *          onOpenFinding?:Function}} [handlers] optional overrides — WP-B may
+ *          onOpenFinding?:Function, onActivateRow?:Function}} [handlers]
+ *        optional overrides — `onActivateRow` runs before either open and is
+ *        how the compact drawer gets out of its own card's way — WP-B may
  *        wire these explicitly rather than through `ctx`. Whichever is present
  *        wins; the `ctx` route is the default so the two-argument call in
  *        docs/contracts.md § 11 works unchanged.
@@ -155,6 +188,13 @@ export function createPanels(els, ctx, handlers = {}) {
    * A session loaded from LOCAL FILES gets one extra sentence: a link to this
    * page will open empty. Local files cannot travel in a URL, and pretending
    * otherwise is the failure mode worth a sentence (docs/contracts.md § 14).
+   *
+   * `summary.comparing` IS THE SWEEP. The comparison takes seconds — 7.9–8.4 s
+   * for the demo set — and this line used to be written only when it ended, so
+   * for all of that time the first sentence in the drawer said "Nothing is
+   * loaded" over twelve loaded proposals and a map painting them. During the
+   * sweep it says what IS known (the week, the count, the areas) and that the
+   * rest is still being worked out; the counts arrive when they are true.
    */
   function renderSession(summary = null) {
     const node = els?.sessionLine;
@@ -163,6 +203,15 @@ export function createPanels(els, ctx, handlers = {}) {
     const n = Array.isArray(proposals) ? proposals.length : (summary?.count ?? 0);
     if (!n) {
       node.textContent = summary?.sentence ?? 'Nothing is loaded yet.';
+      return;
+    }
+    if (summary?.comparing) {
+      const week = summary?.week ?? ctx?.week ?? proposals[0]?.week ?? null;
+      const areas = summary?.areas
+        ?? new Set(proposals.map((p) => p?.aoi?.id).filter(Boolean)).size;
+      node.textContent = `${week ? `Week ${week}` : 'An unrecorded week'} · ` +
+        `${n} proposal${n === 1 ? '' : 's'} loaded over ${areas} working ` +
+        `area${areas === 1 ? '' : 's'} — comparing…`;
       return;
     }
     const findings = summary?.findings ?? ctx?.findings ?? [];
@@ -236,19 +285,25 @@ export function createPanels(els, ctx, handlers = {}) {
     }
 
     const pending = [];
+    let seq = 0;
     for (const [, g] of groups) {
       const block = el('div', { class: 'proposal-group' },
         el('h3', {}, `${g.name} (${g.items.length})`));
-      for (const p of g.items) block.append(proposalRow(p, pending));
+      for (const p of g.items) block.append(proposalRow(p, pending, seq++));
       host.append(block);
     }
     scheduleRechecks(pending);
   }
 
   /** One `.proposal-row`. Pushes its re-check job onto `pending`. */
-  function proposalRow(p, pending) {
+  function proposalRow(p, pending, seq = 0) {
     const id = p?.id ?? '';
-    const short = p?.shortId ?? id.slice(0, 8);
+    /* THE CHECKBOX ID MUST BE UNIQUE, and `shortId` is the only thing that
+       normally makes it so. A package with no id at all gave two rows the id
+       `show-` — a duplicate id, so the second `<label for>` pointed at the
+       first row's box and ticking one moved the other. The row's position is
+       the fallback, because it is the one thing that cannot collide. */
+    const short = p?.shortId || id.slice(0, 8) || `row-${seq}`;
     const mark = markOf(p);
     const style = markStyle(mark?.dash ?? 0);
     const shown = isShown(ctx, id);
@@ -264,14 +319,14 @@ export function createPanels(els, ctx, handlers = {}) {
     const label = el('label', { for: `show-${short}` },
       el('span', { class: `mark-swatch ${style.className}`, 'aria-hidden': 'true' }),
       el('span', { class: 'mark-letter' }, mark?.letter ?? '?'),
-      el('span', {}, p?.author?.name ?? 'An unnamed author'));
+      el('span', {}, authorName(p?.author, true)));
 
     const row = el('div', { class: `proposal-row${shown ? ' is-shown' : ''}`,
       'data-proposal-id': id },
     el('div', { class: 'proposal-check' }, box, label));
 
     const meta = [
-      p?.author?.role,
+      roleWord(p?.author?.role),
       p?.author?.affiliation,
       `${p?.patches?.length ?? 0} change${(p?.patches?.length ?? 0) === 1 ? '' : 's'}`,
       (p?.changes ?? []).map((c) => c.class).join(' '),
@@ -282,14 +337,20 @@ export function createPanels(els, ctx, handlers = {}) {
        until the check finished would read as a row with nothing to say. */
     const verdict = el('p', { class: 'recheck-line' }, 'Re-check: checking…');
     row.append(verdict);
-    pending.push({ proposal: p, node: verdict });
+    /* COMPLETENESS IS NOT THE VERDICT. It is a second line, in the ordinary
+       note grade, because a missing rationale is a fact about the paperwork and
+       the verdict above it is a statement about the ground. */
+    const paperwork = el('p', { class: 'completeness-line' });
+    paperwork.hidden = true;
+    row.append(paperwork);
+    pending.push({ proposal: p, node: verdict, paperwork });
 
     /* "Details" is the visible label, so the accessible name must contain it
        (WCAG 2.5.3) — and it must not contain, or be contained by, the
        checkbox's "A · Marla Teigen". The comma is what keeps the two apart. */
     const details = button('Details', () => openProposal(p));
     details.setAttribute('aria-label',
-      `Details of proposal ${mark?.letter ?? '?'}, ${p?.author?.name ?? 'an unnamed author'}`);
+      `Details of proposal ${mark?.letter ?? '?'}, ${authorName(p?.author)}`);
     row.append(el('div', { class: 'proposal-tools' }, details));
     return row;
   }
@@ -302,10 +363,13 @@ export function createPanels(els, ctx, handlers = {}) {
   /**
    * A checkbox moved: hand the whole set back, never one id.
    *
-   * EMPTY MEANS ALL. `ctx.shown` is a Set that is empty when nothing has been
-   * hidden (js/app.js § State), and `?show=` is emitted only when not all are
-   * shown — so "everything ticked" has to arrive as `[]` or the URL grows a
-   * parameter that says nothing.
+   * AND SAY WHETHER IT IS ALL OF THEM. `ctx.shown` is a Set that is empty when
+   * nothing has been hidden (js/app.js § State), and `?show=` is emitted only
+   * when not all are shown — so "everything ticked" has to reach the app as the
+   * default. It used to do that by arriving as `[]`, which is also what "none
+   * ticked" looks like: unticking the last box announced "Showing every loaded
+   * proposal" over a drawer with nothing ticked. The `all` flag is the
+   * difference, and the app decides what to do with each.
    */
   function onShownChanged() {
     const boxes = [...(els?.proposalList?.querySelectorAll('input[type="checkbox"]') ?? [])];
@@ -317,15 +381,21 @@ export function createPanels(els, ctx, handlers = {}) {
     for (const b of boxes) {
       b.closest('.proposal-row')?.classList.toggle('is-shown', b.checked);
     }
-    const ids = on.length === rows.length ? [] : on;
-    if (typeof handlers.onToggleShown === 'function') handlers.onToggleShown(ids);
-    else ctx?.setShown?.(ids);
+    /* `{ ids, all }`, never a bare list: an empty `shown` set means EVERY
+       proposal, so "all twelve ticked" and "none ticked" both arrive as `[]`
+       and the app cannot tell them apart (docs/contracts.md § 12). */
+    const request = { ids: on, all: on.length === rows.length };
+    if (typeof handlers.onToggleShown === 'function') handlers.onToggleShown(request);
+    else ctx?.setShown?.(request);
     /* Dim the findings the hidden proposals take part in. The list is not
        rebuilt — the answer did not change, only what is drawing. */
     repaintDimming();
   }
 
   function openProposal(p) {
+    /* Same reason as `openFinding`: a card opened from the compact drawer lands
+       behind it. "Details" is a row activation too. */
+    handlers.onActivateRow?.(p);
     if (typeof handlers.onOpenProposal === 'function') handlers.onOpenProposal(p);
     else if (typeof ctx?.openProposal === 'function') ctx.openProposal(p);
     else ctx?.cards?.showProposal?.(p);
@@ -344,6 +414,11 @@ export function createPanels(els, ctx, handlers = {}) {
    * `setTimeout(0)` rather than `requestIdleCallback`: Safari does not have the
    * latter, and the editor's cautionary tale is a background pre-warm whose
    * idle fallback WAS the Safari code path.
+   *
+   * ONE SENTENCE WHEN THE QUEUE DRAINS, and not one per row. The verdicts land
+   * seconds after the list renders, out of any live region, so a screen reader
+   * never learned that twelve packages had been re-checked at all; twelve
+   * separate announcements would be twelve interruptions for one fact.
    */
   function scheduleRechecks(jobs) {
     if (!jobs.length) return;
@@ -352,10 +427,36 @@ export function createPanels(els, ctx, handlers = {}) {
       recheckTimer = null;
       const job = jobs[i++];
       if (!job) return;
-      if (job.node.isConnected) paintRecheck(job.proposal, job.node);
+      if (job.node.isConnected) paintRecheck(job.proposal, job.node, job.paperwork);
       if (i < jobs.length) recheckTimer = setTimeout(step, 0);
+      else announceRechecks(jobs);
     };
     recheckTimer = setTimeout(step, 0);
+  }
+
+  /**
+   * "Re-checked 12 proposals: 10 agree to within residue, 2 exactly, none
+   * defective." — the whole queue, once, in the grades' own words.
+   */
+  function announceRechecks(jobs) {
+    const grades = jobs.map((j) => recheckOf(j.proposal)?.grade ?? null).filter(Boolean);
+    if (!grades.length) return;
+    const n = grades.length;
+    const exact = grades.filter((g) => g === 'pass').length;
+    const residue = grades.filter((g) => g === 'residue').length;
+    const defective = grades.filter((g) => g === 'defect').length;
+    const parts = [];
+    if (residue) parts.push(`${residue} agree to within residue`);
+    if (exact) parts.push(`${exact} exactly`);
+    parts.push(defective
+      ? `${defective} defective`
+      : 'none defective');
+    const incomplete = jobs
+      .filter((j) => (recheckOf(j.proposal)?.completeness ?? []).length).length;
+    const paperwork = incomplete
+      ? ` ${incomplete} ${incomplete === 1 ? 'is' : 'are'} missing a rationale or an author.`
+      : '';
+    ctx?.live?.(`Re-checked ${n} proposal${n === 1 ? '' : 's'}: ${parts.join(', ')}.${paperwork}`);
   }
 
   /** The grade for one proposal, computed at most once per session. */
@@ -376,7 +477,7 @@ export function createPanels(els, ctx, handlers = {}) {
     return out;
   }
 
-  function paintRecheck(p, node) {
+  function paintRecheck(p, node, paperwork = null) {
     const r = recheckOf(p);
     if (!r) { node.textContent = 'Re-check: not run.'; return; }
     node.textContent = r.sentence;
@@ -384,6 +485,12 @@ export function createPanels(els, ctx, handlers = {}) {
        `residue`, and a warning that fires on ten of twelve has told the reader
        nothing (docs/contracts.md § 16.8). */
     node.classList.toggle('is-defect', r.grade === 'defect');
+    /* ONE reader-facing sentence for the paperwork, never the editor's form
+       hints — those are addressed to an author in front of a form. */
+    if (paperwork) {
+      paperwork.textContent = r.completenessSentence ?? '';
+      paperwork.hidden = !paperwork.textContent;
+    }
   }
 
   /* ── § 3. The findings list ────────────────────────────────────────────── */
@@ -410,8 +517,12 @@ export function createPanels(els, ctx, handlers = {}) {
     for (const [host, kind, title, empty] of groups) {
       if (!host) continue;
       const items = list.filter((f) => f?.kind === kind);
+      /* The COUNT goes into the <h3> inside the <summary>, never over it: these
+         three are the primary structure of this panel, and heading navigation
+         skipped all of them while they were bare summaries (WCAG 1.3.1). */
       const summary = host.querySelector('summary');
-      if (summary) summary.textContent = `${title} (${items.length})`;
+      const label = summary?.querySelector('h3') ?? summary;
+      if (label) label.textContent = `${title} (${items.length})`;
       const ol = host.querySelector('ol');
       if (!ol) continue;
       ol.replaceChildren(...items.map((f, i) => el('li', {}, findingRow(f, i))));
@@ -453,15 +564,31 @@ export function createPanels(els, ctx, handlers = {}) {
       tabindex: index === 0 ? '0' : '-1',
     });
     const lines = f?.kind === 'seam' ? seamLines(f) : regionLines(f);
+    /* THE DIMMING NEEDS A WORD, not just an opacity. The row stays operable and
+       stays in the roving order, so the inactive-component exemption does not
+       apply and nothing but a colour said what had happened. It is built here
+       and merely shown or hidden by `repaintDimming`, because a checkbox moving
+       must never rebuild a row a keyboard reader is standing on. */
+    const dimNote = el('span', { class: 'sr-only dim-note' }, ' (its proposal is hidden)');
+    dimNote.hidden = true;
     b.append(
       el('span', { class: 'finding-where' }, lines.where),
       el('span', { class: 'finding-what' }, ...lines.what),
-      el('span', { class: 'finding-size' }, lines.size));
+      el('span', { class: 'finding-size' }, lines.size),
+      dimNote);
     b.addEventListener('click', () => openFinding(f));
     b.addEventListener('keydown', onRowKey);
-    if (isDimmed(f)) b.classList.add('is-dimmed');
+    setDimmed(b, isDimmed(f));
     rowsById.set(f?.id, b);
     return b;
+  }
+
+  /** Both channels of "its proposal is hidden": the class and the sentence. */
+  function setDimmed(row, dimmed) {
+    if (!row) return;
+    row.classList.toggle('is-dimmed', dimmed);
+    const note = row.querySelector('.dim-note');
+    if (note) note.hidden = !dimmed;
   }
 
   /** Where · what · how big, for a region (docs/contracts.md § 4). */
@@ -503,9 +630,13 @@ export function createPanels(els, ctx, handlers = {}) {
          at the line, against a far side it names as unread. */
       ?? [...runs].sort((x, y) => (y?.lengthKm ?? 0) - (x?.lengthKm ?? 0))[0] ?? null;
     const stepKm = runs.reduce((s, r) => s + (r?.lengthKm ?? 0), 0);
+    /* "BOTH SIDES", the same two words the legend and the card use. The row
+       said "reciprocal" while the legend beside it said "both sides", and a
+       reader who has to work out that those are one thing has been given two
+       vocabularies for one fact. */
     const what = [
       worst ? `${classWord(worst.classA)} → ${classWord(worst.classB)}` : 'no step',
-      ` · ${f?.reciprocal ? 'reciprocal' : 'one-sided'}`,
+      ` · ${f?.reciprocal ? 'both sides' : 'one side'}`,
       f?.isNew ? ' · new' : '',
     ];
     /* "OF N MI SHARED" IS A CLAIM ABOUT THE BORDER, and the border is only
@@ -548,12 +679,20 @@ export function createPanels(els, ctx, handlers = {}) {
   }
 
   function repaintDimming() {
-    for (const f of ctx?.findings ?? []) {
-      rowsById.get(f?.id)?.classList.toggle('is-dimmed', isDimmed(f));
-    }
+    for (const f of ctx?.findings ?? []) setDimmed(rowsById.get(f?.id), isDimmed(f));
   }
 
+  /**
+   * A row was activated.
+   *
+   * `onActivateRow` runs FIRST and is the compact drawer's way out: on a phone
+   * the drawer is an overlay over the map, so opening a finding from it put the
+   * bottom sheet behind the panel the reader was still looking through — a
+   * scrim-dimmed sliver of the card they asked for. The panel does not know
+   * what compact is; js/app.js does, and it is handed the hook.
+   */
   function openFinding(f) {
+    handlers.onActivateRow?.(f);
     if (typeof handlers.onOpenFinding === 'function') handlers.onOpenFinding(f);
     else if (typeof ctx?.openFinding === 'function') ctx.openFinding(f);
     else ctx?.select?.({ kind: f?.kind, id: f?.id });
@@ -617,17 +756,24 @@ export function createPanels(els, ctx, handlers = {}) {
    * is real and deliberately never painted, because this map has terrain and
    * classes underneath where NDMC's PNG has nothing.
    *
-   * Under either ramp, the MARKS: one row per shown proposal, then the finding
-   * and seam marks. Every pair of marks differs on at least two axes, and every
-   * row carries a name.
+   * Under either ramp, the MARKS — and only the ones the view actually draws.
+   * Proposal outlines are grouped by working area with the letter inside the
+   * swatch (`proposalMarksBlock`) and are absent from Differences, which hides
+   * every one of them; the finding marks carry a width the proposal marks do
+   * not. Every pair of marks differs on at least two axes, and every row
+   * carries a name.
    */
   function renderLegend(view = ctx?.view ?? 'proposal') {
     const host = els?.legendBody;
     if (!host) return;
     const blocks = [];
     blocks.push(view === 'differences' ? changeRampBlock() : classRampBlock());
-    blocks.push(marksBlock());
-    host.replaceChildren(...blocks);
+    /* THE MARKS FOLLOW THE VIEW, exactly as the ramp above does — see
+       `marksBlock`. A legend listing twelve letter swatches in a view that
+       hides every one of them is a legend for a different screen. */
+    if (view !== 'differences') blocks.push(proposalMarksBlock());
+    blocks.push(marksBlock(view));
+    host.replaceChildren(...blocks.filter(Boolean));
     if (els?.legendKey) {
       els.legendKey.textContent = view === 'differences'
         ? 'Colours are NDMC’s published class-change encoding. Ground that did ' +
@@ -667,27 +813,78 @@ export function createPanels(els, ctx, handlers = {}) {
     return block;
   }
 
-  /** A line swatch in one of the four border styles. */
+  /**
+   * A line swatch in one of the four border styles.
+   *
+   * `is-ground` puts it on a tinted panel: the new-seam mark is a white CASING
+   * around a coloured line, and white-on-white is not a picture of anything —
+   * the swatch for "the published map did not have this step" and the swatch
+   * for an ordinary seam were the same two pixels.
+   */
   function lineSwatch(...extra) {
-    return el('span', { class: ['legend-line', ...extra].filter(Boolean).join(' ') });
+    const line = el('span', { class: ['legend-line', ...extra].filter(Boolean).join(' ') });
+    if (!extra.includes('is-new-seam')) return line;
+    return el('span', { class: 'legend-ground' }, line);
   }
 
-  function marksBlock() {
-    const block = el('div', { class: 'legend-block legend-marks' }, el('h3', {}, 'Marks'));
+  /**
+   * ONE ROW PER SHOWN PROPOSAL, grouped by working area, LETTER IN THE SWATCH.
+   *
+   * Four dash patterns and twelve proposals means the pattern repeats by
+   * design — it cycles WITHIN a working area, because two proposals over
+   * different states never overlap and only the ones that CAN overlap have to
+   * be told apart. Read as a flat list of twelve, though, five rows were the
+   * same solid rule and five the same dash: the picture said nothing and the
+   * letter beside it did all the work. Grouping restores the reading (inside
+   * Montana, these three patterns ARE different) and the letter moves inside
+   * the swatch, which is where the map already draws it.
+   */
+  function proposalMarksBlock() {
     const proposals = (ctx?.proposals ?? []).filter((p) => isShown(ctx, p?.id));
+    if (!proposals.length) return null;
+    const block = el('div', { class: 'legend-block legend-marks' },
+      el('h3', {}, 'Proposal outlines'));
+    const groups = new Map();
     for (const p of proposals) {
-      const mark = markOf(p);
-      const style = markStyle(mark?.dash ?? 0);
-      const cls = { solid: null, dashed: 'is-dashed', dotted: 'is-dotted', double: 'is-double' }[style.swatch];
-      block.append(legendRow(lineSwatch(cls),
-        `${mark?.letter ?? '?'} · ${p?.author?.name ?? 'An unnamed author'}`,
-        p?.aoi?.name ?? null));
+      const key = p?.aoi?.id ?? '—';
+      if (!groups.has(key)) groups.set(key, { name: p?.aoi?.name ?? key, items: [] });
+      groups.get(key).items.push(p);
     }
-    /* The six marks the findings themselves wear. Each names what it means —
-       a dash pattern is not a name. */
+    for (const [, g] of groups) {
+      const area = el('div', { class: 'legend-area' },
+        el('p', { class: 'legend-area-name' }, g.name));
+      for (const p of g.items) {
+        const mark = markOf(p);
+        const style = markStyle(mark?.dash ?? 0);
+        const swatch = el('span', { class: `legend-mark ${style.className}` },
+          el('span', { class: 'mark-letter' }, mark?.letter ?? '?'));
+        area.append(legendRow(swatch, authorName(p?.author, true)));
+      }
+      block.append(area);
+    }
+    return block;
+  }
+
+  /**
+   * The marks the FINDINGS wear, and only the ones this view draws.
+   *
+   * The one-sided outlines are off outside Differences (js/map.js
+   * `paintVisibility`), so the row for them is too. Each mark names what it
+   * means — a dash pattern is not a name — and each differs from the proposal
+   * marks above by WIDTH as well as rhythm, which is the axis the map already
+   * separates them on (1.6 px a patch, 2.2 px a finding, 3 px a seam, 6 px the
+   * selection).
+   */
+  function marksBlock(view = 'proposal') {
+    const block = el('div', { class: 'legend-block legend-marks' }, el('h3', {}, 'Findings'));
     block.append(
-      legendRow(lineSwatch(), 'Conflict', 'Two proposals answer this ground differently'),
-      legendRow(lineSwatch('is-dashed'), 'One-sided', 'One proposal changed it; the other left it'),
+      legendRow(lineSwatch('is-finding'), 'Conflict',
+        'Two proposals answer this ground differently'));
+    if (view === 'differences') {
+      block.append(legendRow(lineSwatch('is-finding', 'is-dashed'), 'One-sided',
+        'One proposal changed it; the other left it'));
+    }
+    block.append(
       legendRow(lineSwatch('is-seam'), 'Seam, both sides', 'A step at a shared border, both sides proposed'),
       legendRow(lineSwatch('is-seam', 'is-dashed'), 'Seam, one side', 'A step at a shared border, one side proposed'),
       legendRow(lineSwatch('is-new-seam'), 'New seam', 'The published map did not have this step'),

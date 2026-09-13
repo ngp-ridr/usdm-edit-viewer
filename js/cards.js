@@ -51,7 +51,7 @@ import { renderDeltaTable } from '../vendor/usdm-editor/js/submit.js';
 import { prose } from '../vendor/usdm-editor/js/changes.js';
 import { fmtMi, fmtMi2, MI2 } from '../vendor/usdm-editor/js/units.js';
 import { USDM_CHANGE_LABELS } from '../vendor/usdm-editor/js/color.js';
-import { classPhrase, classSwatch, surnameOf } from './panels.js';
+import { authorName, classPhrase, classSwatch, roleWord, surnameOf } from './panels.js';
 import { normalizeRecheck } from './recheck.js';
 import { copyBrief, downloadBrief } from './export.js';
 
@@ -135,7 +135,11 @@ export function createCards(els, ctx, handlers = {}) {
         p.aoi?.name ?? p.aoi?.id ?? 'an unnamed working area',
         p.week ? `week ${p.week}` : null,
         `${nChanges} change${nChanges === 1 ? '' : 's'}`,
-        p.created ? `created ${new Date(p.created).toLocaleDateString()}` : null,
+        /* ISO, like every other date in this app and in the packages
+           themselves. `toLocaleDateString` printed "9/8/2026" beside "week
+           2026-09-08" — two spellings of the same kind of fact, one of which
+           means a different day in half the world. */
+        p.created ? `created ${isoDay(p.created)}` : null,
       ].filter(Boolean).join(' · ')),
 
       authorBlock(p),
@@ -150,14 +154,22 @@ export function createCards(els, ctx, handlers = {}) {
       heuristicBlock(p),
       provenance(p),
     ];
-    open(`${letterOf(p)} · ${p.author?.name ?? 'An unnamed author'}`, nodes);
+    open(`${letterOf(p)} · ${authorName(p.author, true)}`, nodes);
+  }
+
+  /** `2026-09-08` from whatever the package wrote, or the string it wrote. */
+  function isoDay(created) {
+    const d = new Date(created);
+    return Number.isNaN(d.getTime())
+      ? String(created).slice(0, 10)
+      : d.toISOString().slice(0, 10);
   }
 
   /** Who wrote it, and how to reach them. The email is a real `mailto:`. */
   function authorBlock(p) {
     const a = p.author ?? {};
     const lines = [
-      a.role ? el('p', {}, a.role) : null,
+      el('p', {}, roleWord(a.role)),
       a.affiliation ? el('p', {}, a.affiliation) : null,
       a.onBehalfOf ? el('p', {}, `On behalf of ${a.onBehalfOf}`) : null,
       /* A navigation, not a fetch: `mailto:` needs no CSP change, and an
@@ -165,7 +177,9 @@ export function createCards(els, ctx, handlers = {}) {
       a.email ? el('p', {}, el('a', { href: `mailto:${a.email}` }, a.email)) : null,
     ].filter(Boolean);
     if (!lines.length) return null;
-    return cardBlock(a.name ?? 'Author', ...lines);
+    /* The block's own heading is the NAME, so an empty one has to say what it
+       is rather than render a blank eyebrow over a role. */
+    return cardBlock(a.name?.trim() ? a.name : 'An unnamed author', ...lines);
   }
 
   /**
@@ -174,6 +188,12 @@ export function createCards(els, ctx, handlers = {}) {
    * A `residue` grade is NOT a warning: ten of the twelve bundled proposals
    * grade residue, and painting those amber would tell a reviewer nothing. Only
    * a defect gets the problem list and the "Show me" buttons.
+   *
+   * COMPLETENESS IS A SEPARATE SENTENCE and never the editor's form hints. This
+   * card once printed "Say why this edit is right — a reviewer cannot act on a
+   * blank." and "Your name travels with the proposal." to a reviewer holding
+   * somebody else's file: four imperatives addressed to a person who is not in
+   * the room, over geometry that was perfect (js/recheck.js's header).
    */
   function recheckBlock(p) {
     let r = null;
@@ -185,7 +205,10 @@ export function createCards(els, ctx, handlers = {}) {
     if (!r) return null;
     const verdict = el('p', { class: `recheck-line${r.grade === 'defect' ? ' is-defect' : ''}` },
       r.sentence);
-    if (r.grade !== 'defect') return cardBlock('Re-check', verdict);
+    const paperwork = r.completenessSentence
+      ? el('p', { class: 'completeness-line' }, r.completenessSentence)
+      : null;
+    if (r.grade !== 'defect') return cardBlock('Re-check', verdict, paperwork);
 
     const n = r.problems.length;
     const list = el('ol', { class: 'evidence-list' });
@@ -201,7 +224,7 @@ export function createCards(els, ctx, handlers = {}) {
       }
       list.append(row);
     });
-    return cardBlock('Re-check', verdict, list);
+    return cardBlock('Re-check', verdict, list, paperwork);
   }
 
   /** `{url, label}` anchors and `{image, label}` thumbnails, gated. */
@@ -247,12 +270,22 @@ export function createCards(els, ctx, handlers = {}) {
     return cardBlock('Changes', el('ol', { class: 'evidence-list' }, ...items));
   }
 
-  /** The before/after table, the editor's own renderer. */
+  /**
+   * The before/after table, the editor's own renderer.
+   *
+   * IN A `<figure>` WITH A `<figcaption>`, because the vendored renderer writes
+   * no `<caption>` and this app may not edit a byte of it. A figure caption is
+   * the accessible name of the figure, which is what a table without a caption
+   * is missing (WCAG 1.3.1) — and it says the same thing a caption would.
+   */
   function deltaBlock(p) {
     const rows = (p.changes ?? []).filter((r) =>
       r && r.areaKm2 && typeof r.areaKm2.before === 'number' && r.parts);
     if (!rows.length) return null;
-    return cardBlock('Class areas', renderDeltaTable(rows), hint(AREAS_HINT));
+    const figure = el('figure', { class: 'table-figure' },
+      el('figcaption', {}, 'Area in each drought class before and after this proposal'),
+      renderDeltaTable(rows));
+    return cardBlock('Class areas', figure, hint(AREAS_HINT));
   }
 
   /** What this proposal does at somebody else's border. */
@@ -319,7 +352,10 @@ export function createCards(els, ctx, handlers = {}) {
       p.week ? `drawn against the week of ${p.week}` : null,
       `baseline sha256 ${sha}`,
       p.validationPassed ? 'the author’s own checks passed' : null,
-      p.warningCount ? `${p.warningCount} warning(s) recorded by the editor` : null,
+      /* "warning(s)" is a form field's shorthand, not a sentence. */
+      p.warningCount
+        ? `${p.warningCount} ${p.warningCount === 1 ? 'warning' : 'warnings'} recorded by the editor`
+        : null,
     ].filter(Boolean).join(' · '));
   }
 
@@ -386,7 +422,9 @@ export function createCards(els, ctx, handlers = {}) {
   /** A finding in one sentence, for a list that is not the drawer's. */
   function describeFinding(f) {
     if (f?.kind === 'seam') {
-      return `A ${f.reciprocal ? 'reciprocal' : 'one-sided'} seam along ` +
+      /* "Both sides" / "one side" everywhere — the list, the legend and this
+         sentence used to carry two vocabularies for the same fact. */
+      return `A seam proposed from ${f.reciprocal ? 'both sides' : 'one side'} along ` +
         `${f.sideA?.aoi?.name ?? 'one area'} / ${f.sideB?.aoi?.name ?? 'the other'}, ` +
         `${fmtMi(f.lengthKm ?? 0)} mi of shared border.`;
     }
@@ -452,9 +490,9 @@ export function createCards(els, ctx, handlers = {}) {
     const col = el('div', { class: `side${changed ? ' is-changed' : ''}` },
       el('p', { class: 'side-head' },
         el('span', { class: 'mark-letter' }, letterOf(p)),
-        el('span', {}, p.author?.name ?? 'An unnamed author')),
+        el('span', {}, authorName(p.author, true))),
       el('p', { class: 'side-role' },
-        [p.author?.role, p.author?.affiliation].filter(Boolean).join(' · ')));
+        [roleWord(p.author?.role), p.author?.affiliation].filter(Boolean).join(' · ')));
 
     if (changed) {
       col.append(el('p', { class: 'side-class' }, classSwatch(level),
@@ -463,7 +501,7 @@ export function createCards(els, ctx, handlers = {}) {
       col.append(el('p', { class: 'side-class' }, classSwatch(published),
         el('span', {}, `Left as published — ${classPhrase(published)}`)));
       col.append(el('p', {},
-        `${p.author?.name ?? 'This author'} did not propose a change here.`));
+        `${p.author?.name?.trim() ? p.author.name : 'This author'} did not propose a change here.`));
     }
 
     const byKey = new Map((p.patches ?? []).map((x) => [x.key ?? x.id, x]));
@@ -529,7 +567,7 @@ export function createCards(els, ctx, handlers = {}) {
       el('div', { class: 'side-by-side' },
         seamSide(s.sideA, a, worst?.classA, worst?.publishedA),
         seamSide(s.sideB, b, worst?.classB, worst?.publishedB)),
-      runs.length ? cardBlock('Along the line', runTable(runs)) : null,
+      runs.length ? cardBlock('Along the line', runTable(runs, a, b)) : null,
       seamNotesBlock(s),
       seamEdgeEffectsBlock(s),
       questionsBlock(s),
@@ -545,9 +583,9 @@ export function createCards(els, ctx, handlers = {}) {
       col.append(
         el('p', { class: 'side-head' },
           el('span', { class: 'mark-letter' }, letterOf(p)),
-          el('span', {}, p.author?.name ?? 'An unnamed author')),
+          el('span', {}, authorName(p.author, true))),
         el('p', { class: 'side-role' },
-          [name, p.author?.role].filter(Boolean).join(' · ')));
+          [name, roleWord(p.author?.role)].filter(Boolean).join(' · ')));
       if (level) {
         col.append(el('p', { class: 'side-class' }, classSwatch(level),
           el('span', {}, `${classPhrase(level)} at the line`)));
@@ -568,8 +606,14 @@ export function createCards(els, ctx, handlers = {}) {
     return col;
   }
 
-  /** The runs, in miles. A table because they are read as a column of numbers. */
-  function runTable(runs) {
+  /**
+   * The runs, in miles. A table because they are read as a column of numbers.
+   *
+   * WITH A `<caption>`: the columns are two sides of a border read as "A / B",
+   * and a reader arriving on the table out of context — which is exactly how a
+   * screen reader arrives at one — has no other way to learn that.
+   */
+  function runTable(runs, a, b) {
     const head = el('tr', {}, ...['Run', 'Proposed', 'Published', 'Length']
       .map((h) => el('th', { scope: 'col' }, h)));
     const body = el('tbody', {}, ...runs.map((r, i) => el('tr', {},
@@ -577,8 +621,11 @@ export function createCards(els, ctx, handlers = {}) {
       el('td', {}, `${shortLevel(r.classA)} / ${shortLevel(r.classB)}`),
       el('td', {}, `${shortLevel(r.publishedA)} / ${shortLevel(r.publishedB)}`),
       el('td', { class: 'num' }, `${fmtMi(r.lengthKm ?? 0)} mi`))));
+    const caption = el('caption', {},
+      `Each run along the ${a ?? 'one area'} / ${b ?? 'the other area'} border, ` +
+      'with both sides’ classes as proposed and as published');
     return el('div', { class: 'table-scroll' },
-      el('table', { class: 'data-table' }, el('thead', {}, head), body));
+      el('table', { class: 'data-table' }, caption, el('thead', {}, head), body));
   }
 
   /* `null` and `'none'` are DIFFERENT ANSWERS in a run table. `'none'` means
@@ -597,17 +644,26 @@ export function createCards(els, ctx, handlers = {}) {
       if (!body) continue;
       const p = s[`side${key}`]?.proposal;
       kids.push(el('p', {}, el('strong', {},
-        `${p?.author?.name ?? 'One side'} — note to the neighbour`)), body);
+        `${p?.author?.name?.trim() ? p.author.name : 'One side'} — note to the neighbour`)), body);
     }
     if (!kids.length) return null;
     return cardBlock('Notes to neighbours', ...kids);
   }
 
+  /**
+   * What each side's changes DO at this border.
+   *
+   * The heading is "At this border" and not "What the authors said about this
+   * border": these sentences are `edgeEffects[].statement`, derived by the
+   * editor from the geometry ("Change 2 reaches Wyoming"), not anything an
+   * author wrote. What an author wrote is `seamNotesBlock`, right above, and
+   * two headings claiming the same thing over two different kinds of sentence
+   * is how one auto-derived bullet came to be introduced as testimony.
+   */
   function seamEdgeEffectsBlock(s) {
     const rows = (s.edgeEffects ?? []).map((e) => el('li', {}, e.statement ?? '')).filter((n) => n.textContent);
     if (!rows.length) return null;
-    return cardBlock('What the authors said about this border',
-      el('ul', { class: 'evidence-list' }, ...rows));
+    return cardBlock('At this border', el('ul', { class: 'evidence-list' }, ...rows));
   }
 
   /* ── § 5. Questions and the two actions ────────────────────────────────── */

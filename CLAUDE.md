@@ -97,9 +97,17 @@ unchanged.
   `tools/compare.test.mjs` § 0 greps the source text for all of it.
 - **`css/app.css` is app layout only.** Any rule touching a kit selector is
   tagged `/* kit-override: <why> */` and the header counts them. Keep the count
-  truthful; it is **1** (the MapLibre attribution lift). `#detail-card`'s width
-  is this app's own id and is placement, which the kit says in as many words is
-  the app's job.
+  truthful; it is **2** — the `.ridr-toast` lift (the kit floats it 1.5 rem above
+  the viewport bottom, which on desktop is inside this app's footer) and the
+  `prefers-reduced-motion` reset, which is written on `*` and so reaches the
+  kit's transitions. **The MapLibre attribution lift is NOT one of them and must
+  not come back**: the kit already pads the bottom corners by `--sheet-h`, and
+  this app offsetting them as well threw the attribution a whole sheet-height
+  PAST the sheet, behind the navbar. `#detail-card`'s width and `#info-body`'s
+  prose rhythm are this app's own ids and are placement, which the kit says in as
+  many words is the app's job. App-owned custom properties are spelled
+  `--app-*` (`--app-footer-h`) and `tools/tokens.test.mjs` accepts them beside
+  the theme's.
 - **The USDM colours are data, not brand — two ramps, both in
   `vendor/usdm-editor/js/color.js`.** `D0 #ffff00 … D4 #730000`, plus NDMC's
   published class-change ramp (`USDM_CHANGE_COLORS`, ±5). Never in the theme,

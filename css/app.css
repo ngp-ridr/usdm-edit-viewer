@@ -12,12 +12,16 @@
    !important. Every such rule is tagged `kit-override:` with its reason, and
    tools/tokens.test.mjs counts the tags against the number below.
 
-   kit-override count: 1   ← keep this truthful
+   kit-override count: 2   ← keep this truthful
 
-   The one override is the MapLibre attribution lift in § 2, inherited verbatim
-   from the editor and for the same reason. Everything else names an APP class
-   or one of THIS APP'S OWN ids — `#detail-card`'s width included, which the kit
-   says in as many words is the app's call.
+   The two are the TOAST LIFT in § 9 — the kit floats `.ridr-toast` 1.5 rem
+   above the viewport bottom, which on desktop is inside this app's footer
+   disclaimer — and the REDUCED-MOTION reset in § 12, which is written on `*`
+   and therefore reaches the kit's own transitions. (The MapLibre attribution
+   lift that used to live in § 2 is GONE — the kit already does it, and doing it
+   twice was the bug; see the note there.) Everything else names an APP class or
+   one of THIS APP'S OWN ids — `#detail-card`'s width and `#info-body`'s prose
+   rhythm included, which the kit says in as many words is the app's call.
 
    NO RAW HEX. Every colour is a token; tools/tokens.test.mjs fails on a literal
    in this file. The two USDM ramps are DATA and live in
@@ -26,11 +30,12 @@
    which this page's `style-src 'self'` would silently drop.
 
    Contents:
-     1. Page shell            6. Legend
-     2. Map + status          7. The detail card
-     3. Drawer controls       8. Empty state + drop hint
-     4. The proposal list     9. Footer
-     5. The findings list    10. Compact
+     1. Page shell            7. The detail card
+     2. Map + status          8. Empty state + drop hint
+     3. Drawer controls       9. Footer + the toast lift
+     4. The proposal list    10. Compact
+     5. The findings list    11. About
+     6. Legend               12. Reduced motion
    ========================================================================== */
 
 /* ── 1. Page shell ────────────────────────────────────────────────────────
@@ -86,9 +91,28 @@ body {
   box-shadow: var(--shadow);
   color: var(--text-primary);
   text-align: center;
-  z-index: 5;
+  /* ABOVE THE EMPTY STATE. Both are centred on the same point, and the empty
+     state sits at --z-map-panel (40): a note at the old `z-index: 5` was behind
+     it, which is exactly the state a refused load leaves the app in — nothing
+     is loaded, so the empty state is up, and the sentences saying WHY were
+     under it. One more than the panel, so a dragged file's hint still covers
+     both. */
+  z-index: calc(var(--z-map-panel) + 1);
 }
 #app-note[hidden] { display: none; }
+
+/* SEVERAL SENTENCES ARE A LIST. A dropped folder can fail eight different ways
+   and the eight refusals were joined into one centred run-on paragraph. Each
+   one names a file and what to do about it, so each one is an item; the list is
+   left-aligned inside the centred box, because a ragged-both list of filenames
+   is unreadable. */
+.note-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  text-align: left;
+}
+.note-list li { margin-bottom: 0.25rem; }
+.note-list li:last-child { margin-bottom: 0; }
 
 /* A failure is not a progress update. Three channels rather than one, for the
    same reason both USDM ramps always carry their names — --ochre-dark is the
@@ -114,14 +138,22 @@ body {
   color: var(--text-primary);
 }
 
-/* kit-override: the MapLibre attribution sits bottom-right, which is exactly
-   where the docked detail card lands on desktop and where the bottom sheet
-   lands on compact. --sheet-h is stamped on :root by the kit while a sheet is
-   open and is 0px otherwise, so this lifts only when it must. */
-#map-frame .maplibregl-ctrl-bottom-right {
-  bottom: calc(var(--sheet-h) + env(safe-area-inset-bottom));
-  transition: bottom var(--transition);
-}
+/* THE ATTRIBUTION LIFT IS THE KIT'S, AND THIS APP MUST NOT REPEAT IT.
+   ridr-theme.css § 4 already gives `.maplibregl-ctrl-bottom-left/right`
+   `padding-bottom: calc(env(safe-area-inset-bottom) + var(--sheet-h, 0px))`,
+   which is the whole fix: --sheet-h is stamped on :root while a sheet is open
+   and 0px otherwise.
+
+   This file used to ALSO set `bottom: calc(var(--sheet-h) + …)` on the same
+   element, and the two lifts added up. MapLibre positions that container
+   itself, so offsetting it while the kit was padding it threw the attribution
+   380 px PAST the sheet — at 390×844 with a card open it landed at y≈0, behind
+   the navbar and clipped. Measured before: the group's rect was [0, 0, 390,
+   464] with the attribution itself at y = 10, under a navbar 54 px tall.
+
+   A `transform` here would double up exactly the same way. The rule is simply
+   gone, which is also how the editor answers it (its own rule adds only the
+   insets the KIT cannot know: a desktop dock width, a taller sheet). */
 
 /* ── 3. Drawer controls ───────────────────────────────────────────────────
    The kit ships no <select> component, so its sizing lives here. */
@@ -137,14 +169,21 @@ body {
 }
 #drawer select:disabled { color: var(--text-dim); background: var(--bg-raised); }
 
-/* A <label> naming a control that has no drawer title of its own. Same weight
-   and size as the card's field labels rather than a third label grade. */
+/* A <label> naming a control that has no drawer title of its own.
+   THE EYEBROW GRADE, like every other small heading in this app — the legend's
+   block titles, the proposal groups, the card's section heads. "Whose classes
+   to paint" was the one label in sentence case among a column of uppercase
+   eyebrows, which made it read as a sentence somebody had left behind rather
+   than as the name of the control under it. `text-transform` is presentation
+   only: the accessible name is still the words in the markup. */
 .drawer-label {
   display: block;
   margin: 0.5rem 0 0.25rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 .drawer-label:first-of-type { margin-top: 0; }
 
@@ -211,7 +250,19 @@ body {
 .proposal-row.is-shown { border-left-color: var(--accent-line); }
 
 .proposal-check { display: flex; align-items: flex-start; gap: 0.5rem; }
-.proposal-check input[type="checkbox"] { margin-top: 0.2rem; flex: 0 0 auto; }
+/* A 13×13 px checkbox is the browser's default and it is under WCAG 2.2's
+   24×24 target floor at every width — measured 13×13 at 320 px and at 1440.
+   `width`/`height` and nothing else: a native checkbox scales, and it keeps its
+   platform focus ring, its indeterminate state and its forced-colors rendering,
+   all of which an `appearance: none` reimplementation throws away for a tick
+   somebody drew by hand. The label beside it is a target for the same control
+   and is larger still; this is the floor for the box itself. */
+.proposal-check input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
+}
 .proposal-check label {
   flex: 1 1 auto;
   display: flex;
@@ -277,6 +328,19 @@ body {
 }
 .recheck-line.is-defect { color: var(--ochre-dark); font-weight: 600; }
 .recheck-line.is-defect::before { content: "⚠ "; }
+
+/* THE PAPERWORK, which is not the verdict. A proposal with no rationale and no
+   author re-derives perfectly; the grade above stays geometric and this says
+   the other thing, in the ordinary note grade — never amber, and never the
+   editor's form hints, which are addressed to an author standing in front of a
+   form (js/recheck.js). */
+.completeness-line {
+  margin: 0.125rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.completeness-line[hidden] { display: none; }
 
 .proposal-tools {
   display: flex;
@@ -350,8 +414,26 @@ body {
 
 /* A finding whose proposals are hidden. DIMMED, not removed: the answer does
    not change because a checkbox moved, and a row that vanished would say it
-   did. */
-.finding-row.is-dimmed { opacity: 0.5; }
+   did.
+
+   NOT `opacity`. `opacity: 0.5` composites the whole row — ink AND fill — down
+   to 3.98:1 at 16 px (measured), and these rows stay operable and stay in the
+   roving tab order, so WCAG 1.4.3's inactive-component exemption does not
+   apply to them. The dimming is three channels that each keep their contrast:
+   the fill drops away (the row stops reading as a card), the border goes
+   DASHED — the same "deliberately not painted" spelling the legend's unshaded
+   hole uses — and the ink steps to --text-dim, which the theme guarantees at
+   ≥ 4.5:1 on every surface. js/panels.js adds the fourth: a visually-hidden
+   "(its proposal is hidden)", because none of the three is a sentence. */
+.finding-row.is-dimmed {
+  background: var(--bg-surface);
+  border-style: dashed;
+  border-left-color: var(--border);
+  color: var(--text-dim);
+}
+.finding-row.is-dimmed .finding-what,
+.finding-row.is-dimmed .finding-size { color: var(--text-dim); }
+.finding-row.is-dimmed:hover { background: var(--accent-hover); }
 
 .finding-where { font-size: 0.8125rem; font-weight: 600; }
 .finding-what { font-size: 0.75rem; color: var(--text-secondary); }
@@ -360,6 +442,25 @@ body {
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
 }
+
+/* The findings groups' headings live INSIDE their <summary> (index.html): the
+   three of them are this panel's primary structure and a bare summary is not a
+   heading. The <h3> is the summary's whole content, so it stays inline and
+   wears the summary's own type rather than a block heading's. */
+#findings-section summary h3 {
+  display: inline;
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+/* The dimmed row's sentence is a `.sr-only` span, and `.sr-only` is the KIT'S
+   (ridr-theme.css § 3, every declaration `!important`). Nothing is restated
+   here: a second copy would be a kit-override for no gain, and the kit's
+   `[hidden] { display: none !important }` is what hides it while the row is
+   drawing. */
 
 /* ── 6. Legend ────────────────────────────────────────────────────────────
    Swatch + full name, worst first. The name is the second channel BOTH
@@ -402,10 +503,50 @@ body {
   background: transparent;
 }
 
-/* THE MARK ROWS — one per shown proposal, then the finding and seam marks.
-   Each line swatch is drawn as a border in the same four styles the map's four
-   `patches-line-*` layers use, and each row carries its letter and its author,
-   because a dash pattern is not a name. */
+/* THE PROPOSAL MARKS — one row per shown proposal, GROUPED BY WORKING AREA,
+   with the letter INSIDE the swatch.
+   The dash pattern cycles 0–3 within an area, so a flat list of twelve showed
+   five identical solid rules and five identical dashes: the picture said
+   nothing and the letter beside it did all the work. Grouped, the patterns are
+   distinct everywhere they can overlap, which is the only place they have to
+   be — and the letter in the swatch is the same pairing the map draws. */
+.legend-area { margin-top: 0.375rem; }
+.legend-area:first-of-type { margin-top: 0; }
+.legend-area-name {
+  margin: 0 0 0.125rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.legend-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  min-height: 1rem;
+  justify-self: center;
+  padding-bottom: 1px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom-width: 3px;
+  border-bottom-color: var(--text-primary);
+}
+.legend-mark.mark-0 { border-bottom-style: solid; }
+.legend-mark.mark-1 { border-bottom-style: dashed; }
+.legend-mark.mark-2 { border-bottom-style: dotted; }
+.legend-mark.mark-3 { border-bottom-style: double; border-bottom-width: 4px; }
+/* The letter is already the swatch here; the boxed `.mark-letter` treatment the
+   proposal list uses would be a box inside a box. */
+.legend-mark .mark-letter { min-width: 0; padding: 0; border: 0; }
+
+/* THE FINDING MARKS. Each line swatch is a border, and each differs from the
+   proposal marks above by WIDTH as well as by rhythm — the axis the map itself
+   separates them on (1.6 px a patch, 2.2 px a finding, 3 px a seam, 6 px the
+   selection). Colour is never one of the channels: under the default
+   high-contrast theme every one of these is the same black. */
 .legend-line {
   width: 1.5rem;
   height: 0;
@@ -417,16 +558,40 @@ body {
 .legend-line.is-dashed { border-top-style: dashed; }
 .legend-line.is-dotted { border-top-style: dotted; }
 .legend-line.is-double { border-top-style: double; border-top-width: 4px; }
+/* A conflict and a one-sided difference are the app's own outlines rather than
+   anyone's proposal: heavier than a patch mark, lighter than a seam. */
+.legend-line.is-finding { border-top-width: 5px; }
 /* A seam is drawn in the reach token on the map; the swatch says so too. */
 .legend-line.is-seam { border-top-color: var(--map-reach-line); }
-/* A new seam wears a white casing on the map; here it is a second rule under
-   the first, which is the flattest thing that reads as "thicker, with an edge". */
+/* A new seam wears a WHITE CASING on the map, and white casing on a white panel
+   is not a picture of anything — this swatch and the plain seam's were the same
+   two pixels. `.legend-ground` puts it on a tinted card so the casing has
+   something to be an edge against. */
+.legend-ground {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  padding: 0.25rem 0.125rem;
+  justify-self: center;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+.legend-ground .legend-line { justify-self: auto; width: 1.25rem; }
 .legend-line.is-new-seam {
   border-top-color: var(--map-reach-line);
   border-bottom: 3px solid var(--bg-surface);
   height: 3px;
 }
-.legend-line.is-selected { border-top-color: var(--selection-ring); border-top-style: dashed; }
+/* WIDER THAN EVERYTHING IT SITS ON, exactly as on the map: `--selection-ring`
+   and `--text-primary` are the same black under the high-contrast theme, so
+   width and rhythm are the whole mark. */
+.legend-line.is-selected {
+  border-top-color: var(--selection-ring);
+  border-top-style: dashed;
+  border-top-width: 6px;
+}
 
 /* The marks block sits under whichever ramp the view is showing, and it is a
    different KIND of list — the ramps say what the ground is, these say who drew
@@ -488,18 +653,22 @@ body {
 
 .card-actions { display: flex; flex-wrap: wrap; gap: 0.375rem; }
 
-/* ── THE SIDE-BY-SIDE GRID ────────────────────────────────────────────────
-   The whole reason this card is wider than the editor's. A disagreement is two
-   answers about one piece of ground, and reading them one after the other asks
-   the reader to hold the first in their head while they read the second —
-   which is exactly the thing they are here to compare.
+/* ── THE SIDE-BY-SIDE, WHICH IS ONE COLUMN ────────────────────────────────
+   ONE COLUMN AT EVERY WIDTH, and the name is kept because the SHAPE is still
+   two answers about one piece of ground, in source order A then B.
 
-   Two columns where there is room; ONE column below 34rem of card, stacked,
-   because two 8rem columns of prose are worse than a stack. The source order
-   is A then B, so the stacked reading is the same reading. */
+   It was `repeat(auto-fit, minmax(11rem, 1fr))`, which at 1440 and at 1024
+   fitted two tracks into a 28 rem card and handed each rationale about 200 px —
+   roughly 32 characters a line, measured, for the two blocks of prose the whole
+   card exists to let somebody read. The same card stacked at 900 px and read
+   perfectly well. A column of 65 characters that has to be scrolled beats two
+   columns of 32 that do not: the comparison a reader is making is between two
+   ARGUMENTS, not two silhouettes, and nobody reads an argument four words at a
+   time. The classes, the authors and the sizes — the parts that ARE read side
+   by side — are one short line each at the top of each block. */
 .side-by-side {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: 1fr;
   gap: 0.5rem;
 }
 
@@ -543,7 +712,21 @@ body {
 .questions { margin: 0; padding-left: 1.25rem; font-size: 0.8125rem; line-height: 1.5; }
 .questions li { margin-bottom: 0.375rem; }
 
-/* The run table on a seam card, and the delta table on a proposal card. */
+/* The run table on a seam card, and the delta table on a proposal card.
+   BOTH ARE NAMED. The run table carries a real `<caption>`; the delta table is
+   the vendored renderer's and may not be edited, so js/cards.js wraps it in a
+   `<figure>` whose `<figcaption>` does the same job. Left-aligned and quiet:
+   it is a label, not a heading. */
+.data-table caption,
+.table-figure figcaption {
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--text-muted);
+}
+.table-figure { margin: 0; }
+
 .data-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
 .data-table th, .data-table td { padding: 0.3125rem 0.4375rem; text-align: right; }
 .data-table th:first-child, .data-table td:first-child { text-align: left; }
@@ -608,32 +791,56 @@ body {
 
 /* Raised on dragenter over `#map-frame`. Deliberately covers the whole frame:
    the drop target IS the whole frame, and a hint smaller than its target
-   teaches the wrong aim. */
+   teaches the wrong aim.
+
+   TWO FIXES LIVE IN THIS RULE.
+
+   It sat at --z-map-notice (20), UNDER the empty state (--z-map-panel, 40) —
+   so on the one screen where a first drop actually happens, "Drop proposal
+   files to load them" was behind the card, and the undimmed card in front of it
+   read as the target. It is now at --z-detail: above the empty state and every
+   map notice, below the drawer, and behind the detail card (equal tier, and the
+   card comes later in the document), which is right — the card is not a drop
+   target.
+
+   And it no longer paints `--map-dim` over the map. The exception list for a
+   fill over the USDM classes is closed and a drag hint is not on it: a
+   translucent wash makes the same drought read as two classes for as long as a
+   file is over the window. THE CHROME DIMS INSTEAD — a thick dashed rule inside
+   a --glass inset ring, which says "this whole frame" without touching a single
+   class colour. */
 .drop-hint {
   position: absolute;
   inset: 0;
-  z-index: var(--z-map-notice);
+  z-index: var(--z-detail);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--map-dim);
+  background: transparent;
   border: 3px dashed var(--accent-line);
   border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 0.5rem var(--glass);
   pointer-events: none;
 }
 .drop-hint[hidden] { display: none; }
+/* THE MESSAGE IS A CARD IN ITS OWN RIGHT. It lands over the empty state, which
+   is also `--bg-surface` with no shadow under the default high-contrast theme
+   — so an unbordered box read as loose text floating through the paragraph
+   underneath it. The accent rule is the same one the frame wears, which is what
+   ties the sentence to the target it names. */
 .drop-hint p {
   margin: 0;
-  padding: 0.625rem 1rem;
+  padding: 0.75rem 1.25rem;
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
   background: var(--bg-surface);
+  border: 2px solid var(--accent-line);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow);
 }
 
-/* ── 9. Footer ────────────────────────────────────────────────────────────── */
+/* ── 9. Footer, and the toast that has to clear it ───────────────────────── */
 
 .app-footer {
   padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom));
@@ -646,6 +853,25 @@ body {
 .app-footer p { margin: 0; }
 .app-footer a { color: var(--accent-line); }
 
+/* THE FOOTER'S HEIGHT, as one number two rules read.
+   The disclaimer is fixed copy, so its height is a function of the width alone:
+   two lines wide, three when the row narrows. Measured at 1440 × 900: 50 px;
+   at 641 px: 74 px. The clearance below is the larger of the two plus the
+   line-height that separates them, so the toast never lands on the sentence
+   that says this is not the official USDM tool. */
+:root { --app-footer-h: 5.5rem; }
+
+/* kit-override: the kit floats `.ridr-toast` 1.5rem above the VIEWPORT bottom
+   (+ --sheet-h for an open sheet), which is the right answer for an app whose
+   map runs to the bottom edge. This one has a footer under the map row, so a
+   toast at 1.5rem lands on top of the disclaimer — two pieces of text over each
+   other, one of them the legal one. The kit's own offset is kept and this app's
+   footer is added to it; at compact the footer is `display: none` and the token
+   is 0, so the rule reduces to exactly what the kit wrote. */
+.ridr-toast {
+  bottom: calc(1.5rem + var(--sheet-h, 0px) + var(--app-footer-h, 0px));
+}
+
 /* ── 10. Compact ──────────────────────────────────────────────────────────
    The kit already turns the drawer into an overlay and the card into a bottom
    sheet at this breakpoint. What is left is the footer, which costs two lines
@@ -654,6 +880,8 @@ body {
 
 @media (max-width: 640px) {
   .app-footer { display: none; }
+  /* …so the toast has nothing to clear down here. */
+  :root { --app-footer-h: 0px; }
   .undo-row .nav-btn,
   .card-actions .nav-btn,
   .empty-actions .nav-btn { min-height: 2.75rem; }
@@ -662,7 +890,35 @@ body {
      already; this only guarantees the floor. */
   .finding-row { min-height: 2.75rem; }
   .empty-state { padding: 1rem; }
-  /* One column, always: at this width `auto-fit` would still fit two 11rem
-     tracks inside a full-width sheet and hand back 11rem of prose. */
-  .side-by-side { grid-template-columns: 1fr; }
+}
+
+/* ── 11. About ────────────────────────────────────────────────────────────
+   The dialog is the kit's; `#info-body` is this app's own id and the prose
+   rhythm inside it is this app's copy. The kit sets the size, colour and
+   line-height of `.info-section p` and no margins, so About's paragraphs ran
+   together into one grey slab — four sentences about what the tool is and four
+   about what it is not, with nothing between them. */
+
+#info-body p { margin: 0 0 0.75rem; }
+#info-body p:last-child { margin-bottom: 0; }
+#info-body ul { margin: 0 0 0.75rem; }
+
+/* ── 12. Reduced motion ───────────────────────────────────────────────────
+   Everything this file animates is a comfort — a toast sliding, a control
+   lifting clear of a sheet, a row's fill changing under the pointer. A reader
+   who has asked for less of it gets the end state instantly. The MAP's own
+   camera is js/map.js's to answer (`focus()` should pass `animate: false` under
+   the same query); CSS cannot reach a MapLibre easeTo. */
+
+/* kit-override: written on `*`, so it reaches the kit's own transitions — the
+   toast's slide, the drawer's, the sheet's. Deliberately: those are exactly the
+   ones a reader who asked for less motion wants gone, and the kit answers this
+   query for a single spinner dot. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

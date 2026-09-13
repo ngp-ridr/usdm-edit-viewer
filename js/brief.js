@@ -531,6 +531,28 @@ export function buildSessionBrief(session, comparisons = [], seams = [], {
   const week = session.week() ?? 'an unrecorded week';
   const L = [];
 
+  /**
+   * A working area's NAME, from anything in this session that knows one.
+   *
+   * The index's "Where" column and the "Not compared" sentences printed raw ids
+   * — `aiannh:00806896-86`, `state:MT` — into a document written for people in
+   * a meeting. Every loaded proposal carries `aoi.name`, and a neighbour nobody
+   * loaded carries one too: `edgeEffects[].neighborNames` is parallel to
+   * `neighborIds`, which is where the author's own editor got the name from.
+   * The id is kept only when nothing in the session ever named it.
+   */
+  const aoiNames = new Map();
+  for (const p of proposals) {
+    if (p.aoi?.id && p.aoi?.name) aoiNames.set(p.aoi.id, p.aoi.name);
+    for (const e of p.edgeEffects ?? []) {
+      (e.neighborIds ?? []).forEach((id, i) => {
+        const name = e.neighborNames?.[i];
+        if (id && name && !aoiNames.has(id)) aoiNames.set(id, name);
+      });
+    }
+  }
+  const areaName = (id) => aoiNames.get(id) ?? id ?? 'an unnamed area';
+
   L.push(`# Proposed USDM edits for ${week} — where they disagree`);
   L.push('');
   L.push(`${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the week of ` +
@@ -571,7 +593,7 @@ export function buildSessionBrief(session, comparisons = [], seams = [], {
     L.push('| Finding | Where | Disagreement | Ground |');
     L.push('|---|---|---|---|');
     for (const r of [...conflicts, ...oneSided]) {
-      L.push(`| ${idCell(r.id, viewerUrl)} | ${r.aoiId} | ${plain(r.classA)} vs ${plain(r.classB)} ` +
+      L.push(`| ${idCell(r.id, viewerUrl)} | ${areaName(r.aoiId)} | ${plain(r.classA)} vs ${plain(r.classB)} ` +
         `(published ${plain(r.published)}) | ${fmtMi2(r.areaKm2)} ${MI2} |`);
     }
     L.push('');
@@ -583,7 +605,7 @@ export function buildSessionBrief(session, comparisons = [], seams = [], {
     L.push('|---|---|---|---|');
     for (const s of lines) {
       const known = !(s.runs ?? []).length || !s.runs.every((r) => r.step == null);
-      L.push(`| ${idCell(s.id, viewerUrl)} | ${s.aoiIds.join(' / ')} | ` +
+      L.push(`| ${idCell(s.id, viewerUrl)} | ${s.aoiIds.map(areaName).join(' / ')} | ` +
         `${known ? s.maxStep : 'not known'} | ` +
         `${known ? `${fmtMi(s.newStepKm)} mi` : 'not known'} |`);
     }
@@ -601,7 +623,7 @@ export function buildSessionBrief(session, comparisons = [], seams = [], {
     }
   }
   if (unloaded.size) {
-    gaps.push(`No proposal is loaded for ${prose([...unloaded].sort())}, so the far side ` +
+    gaps.push(`No proposal is loaded for ${prose([...unloaded].map(areaName).sort())}, so the far side ` +
       `of any seam toward ${unloaded.size === 1 ? 'it' : 'them'} is the published week ` +
       `rather than somebody's reading of it.`);
   }
@@ -611,7 +633,8 @@ export function buildSessionBrief(session, comparisons = [], seams = [], {
       `side the published week could not be read for; those are reported with one side only.`);
   }
   const singletons = [...new Set(proposals.map((p) => p.aoi?.id))]
-    .filter((id) => proposals.filter((p) => p.aoi?.id === id).length === 1).sort();
+    .filter((id) => proposals.filter((p) => p.aoi?.id === id).length === 1)
+    .map(areaName).sort();
   if (singletons.length) {
     gaps.push(`${prose(singletons)} ${singletons.length === 1 ? 'has' : 'have'} only one ` +
       `proposal loaded, so there is nothing to compare ${singletons.length === 1 ? 'it' : 'them'} ` +

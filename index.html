@@ -164,17 +164,27 @@
              accept=".json,.gz,application/json,application/gzip"
              aria-label="Select proposal files from this computer" hidden>
 
-      <button type="button" class="nav-btn" id="btn-demo"
-              aria-label="Demo — the twelve bundled example proposals">
+      <!-- ONE NAME FOR ONE THING. This button and the empty state's second way
+           in do exactly the same thing, and they were called "Demo" and "Open
+           the example set" — two names for one action, and neither of them the
+           other's, so a reader who had used one could not find it again. Both
+           are "Example set"; identical names for the same action are not the
+           ambiguity WCAG 2.5.3 is about (two DIFFERENT controls sharing a name
+           is). The aria-label carries the visible label because `.btn-label` is
+           hidden at compact widths. -->
+      <button type="button" class="nav-btn" id="btn-demo" aria-label="Example set">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
           <path d="M4 5h16v14H4z"></path><path d="M4 10h16"></path><path d="M10 10v9"></path>
         </svg>
-        <span class="btn-label">Demo</span>
+        <span class="btn-label">Example set</span>
       </button>
 
-      <!-- Disabled until there is something to write about. Every finding as one
-           markdown file — the thing reviewers actually talk from. -->
-      <button type="button" class="nav-btn" id="btn-briefs" disabled
+      <!-- OMITTED until there is something to write about, never disabled: a
+           grey button with nothing loaded is a rule the reader has to work out.
+           js/app.js `paintEmptyState` shows it on the first finding and never
+           hides it again. Every finding as one markdown file — the thing
+           reviewers actually talk from. -->
+      <button type="button" class="nav-btn" id="btn-briefs" hidden
               aria-label="Briefs — download every finding as markdown">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
           <path d="M6 3h9l4 4v14H6z"></path><path d="M9 12h7"></path><path d="M9 16h7"></path>
@@ -216,7 +226,7 @@
 
              `aria-pressed` is the state, on these three controls and nowhere
              else in this app. -->
-        <section class="ridr-drawer-section" id="map-view-section">
+        <section class="ridr-drawer-section" id="map-view-section" hidden>
           <div id="map-view-controls" class="seg-btns" role="group" aria-label="Map view">
             <button type="button" class="nav-btn seg-btn" id="view-proposal" aria-pressed="true">A proposal</button>
             <button type="button" class="nav-btn seg-btn" id="view-published" aria-pressed="false">Published</button>
@@ -232,29 +242,25 @@
           </div>
         </section>
 
-        <!-- ▸ The proposals, grouped by working area. Each row: a checkbox whose
-             label carries the mark (dash swatch + letter) and the author, a meta
-             line, the re-check verdict, and a way to the card.
+        <!-- ▸ THE FINDINGS, FIRST — they are the answer this tool exists to
+             give. They sat under twelve proposal cards, which put "6 conflicts,
+             162 one-sided differences and 20 seams" below the fold on every
+             screen and the legend for the painted ramp about 5,800 px down.
+             What differs → Legend → Proposals is the reading order of the
+             question, its key, and its sources.
 
-             HIDING A PROPOSAL HIDES ITS OUTLINES AND DIMS ITS FINDINGS. It never
-             changes the answer: the comparison is over what was loaded, and a
-             tool whose findings depend on which checkbox is ticked is a tool
-             nobody can quote. js/panels.js `renderProposals`. -->
-        <section class="ridr-drawer-section" id="proposal-section"
-                 aria-labelledby="proposal-title" hidden>
-          <h2 class="ridr-drawer-title" id="proposal-title">Proposals</h2>
-          <div id="proposal-list"></div>
-        </section>
-
-        <!-- ▸ THE FINDINGS. This list is the map's TEXT TWIN — a screen reader
-             cannot see a WebGL canvas, so everything the map marks is also a
-             row here, in the same rank order, with the same words the card uses.
-             The count is mirrored in a role="status" sentence.
+             This list is the map's TEXT TWIN — a screen reader cannot see a
+             WebGL canvas, so everything the map marks is also a row here, in the
+             same rank order, with the same words the card uses. The count is
+             mirrored in a role="status" sentence.
 
              Three groups, conflicts first, because a conflict (two proposals,
              same ground, different answers) is the thing a reconciliation
              meeting has to resolve and a one-sided difference usually is not.
-             js/panels.js `renderFindings`. -->
+             Each <summary> carries an <h3>: these three are the primary
+             structure of this panel and heading navigation skipped all of them
+             while they were bare summaries. js/panels.js `renderFindings`
+             writes the counts into those headings. -->
         <section class="ridr-drawer-section" id="findings-section"
                  aria-labelledby="findings-title" hidden>
           <h2 class="ridr-drawer-title" id="findings-title">What differs</h2>
@@ -265,15 +271,15 @@
             <p class="drawer-note" id="findings-status"></p>
           </div>
           <details id="findings-conflicts" open>
-            <summary>Conflicts</summary>
+            <summary><h3>Conflicts</h3></summary>
             <ol class="finding-group"></ol>
           </details>
           <details id="findings-onesided" open>
-            <summary>One-sided</summary>
+            <summary><h3>One-sided</h3></summary>
             <ol class="finding-group"></ol>
           </details>
           <details id="findings-seams" open>
-            <summary>Seams</summary>
+            <summary><h3>Seams</h3></summary>
             <ol class="finding-group"></ol>
           </details>
         </section>
@@ -285,9 +291,10 @@
              Which ramp is shown follows the view: the USDM classes under
              A proposal and Published, NDMC's change ramp under Differences
              (with "No change — unshaded" as a labelled hole, because the zero
-             band is real and deliberately never painted). Under all of them,
-             one row per shown proposal — dash swatch, letter, author — and the
-             mark rows for conflicts, one-sided differences and seams.
+             band is real and deliberately never painted). Under both, the marks
+             THIS VIEW DRAWS — the proposal outlines grouped by working area
+             with each letter inside its swatch (and absent from Differences,
+             which hides every one of them), then the finding and seam marks.
 
              EVERY SWATCH CARRIES ITS NAME. Both ramps are CVD-hostile through
              the middle; a bare swatch is not a reading. -->
@@ -296,6 +303,21 @@
           <h2 class="ridr-drawer-title" id="legend-title">Legend</h2>
           <div id="legend-body"></div>
           <p id="legend-key" class="ridr-legend-key"></p>
+        </section>
+
+        <!-- ▸ The proposals, grouped by working area — LAST, because they are
+             what the findings are made of rather than the finding. Each row: a
+             checkbox whose label carries the mark (dash swatch + letter) and the
+             author, a meta line, the re-check verdict, and a way to the card.
+
+             HIDING A PROPOSAL HIDES ITS OUTLINES AND DIMS ITS FINDINGS. It never
+             changes the answer: the comparison is over what was loaded, and a
+             tool whose findings depend on which checkbox is ticked is a tool
+             nobody can quote. js/panels.js `renderProposals`. -->
+        <section class="ridr-drawer-section" id="proposal-section"
+                 aria-labelledby="proposal-title" hidden>
+          <h2 class="ridr-drawer-title" id="proposal-title">Proposals</h2>
+          <div id="proposal-list"></div>
         </section>
 
       </div>
@@ -316,11 +338,16 @@
       <div id="map" role="application"
            aria-label="Map of US Drought Monitor severity classes with proposed edits drawn over them"></div>
 
-      <!-- Boot and error messaging. role=status so a failure is announced
-           without stealing focus. The intake's FULL problem list lands here as
-           well — a toast is one sentence and a dropped folder can fail eight
-           different ways. -->
-      <p id="app-note" role="status" hidden></p>
+      <!-- Boot and error messaging. `role="status"` while it is progress, and
+           js/app.js swaps it to `role="alert"` for a failure — the two roles,
+           never `role="status"` with an assertive `aria-live` bolted on, which
+           is a contradiction screen readers resolve differently.
+
+           A <div> rather than a <p>: the intake's FULL problem list lands here
+           as well — a toast is one sentence and a dropped folder can fail eight
+           different ways — and eight sentences are a <ul>, not a run-on
+           paragraph. -->
+      <div id="app-note" role="status" hidden></div>
 
       <!-- ▸ Nothing loaded yet. Not a modal and not a tour: the two ways in are
            right here on the empty map, and dropping a file works anywhere over
@@ -334,7 +361,9 @@
         </p>
         <div class="empty-actions">
           <button type="button" class="nav-btn" id="empty-choose">Choose files to compare</button>
-          <button type="button" class="nav-btn" id="empty-demo">Open the example set</button>
+          <!-- The same name as the navbar's button, because it is the same
+               action — see the note there. -->
+          <button type="button" class="nav-btn" id="empty-demo">Example set</button>
         </div>
         <p class="empty-hint">Or drop files anywhere on the map.</p>
       </div>

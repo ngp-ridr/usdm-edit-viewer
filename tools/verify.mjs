@@ -552,14 +552,20 @@ await shot('01-boot');
   check(await page.locator('#empty-choose').isVisible()
      && await page.locator('#empty-demo').isVisible(),
     'with both ways in — choose files, or open the example set');
-  check(await page.locator('#btn-briefs').isDisabled(),
-    '#btn-briefs is disabled: there is nothing to write a brief about yet');
+  /* OMIT, DON'T DISABLE. This asserted `isDisabled()` until 2026-09: a control
+     that can do nothing is a rule the reader has to work out, and "A proposal"
+     was PRESSED over an app with no proposal in it. Briefs is absent until a
+     comparison has found something to write about, the three view segments are
+     absent until something is loaded, and both appear on the first load and
+     never go away again (js/app.js `paintEmptyState`). */
+  check(await page.locator('#btn-briefs').isHidden(),
+    '#btn-briefs is HIDDEN, not greyed: there is nothing to write a brief about yet');
   check(await page.evaluate(() =>
     document.getElementById('info-modal')?.open !== true),
     'no dialog is open over the map on a first visit');
 
   /* The drawer's data sections start hidden — there is nothing in them. */
-  for (const id of ['proposal-section', 'findings-section', 'legend-section']) {
+  for (const id of ['map-view-section', 'proposal-section', 'findings-section', 'legend-section']) {
     check(await page.locator(`#${id}`).isHidden(), `#${id} is hidden while nothing is loaded`);
   }
 
@@ -618,11 +624,19 @@ await shot('02-demo');
   check(letters.length === 12 && new Set(letters).size === 12,
     `twelve distinct letters, ${letters[0]}…${letters[11]}`);
 
-  /* The drawer's three sections came up with it. */
-  for (const id of ['proposal-section', 'findings-section', 'legend-section']) {
+  /* The drawer's sections came up with it — the view segments included, which
+     are omitted until there is something to view. IN READING ORDER: what
+     differs, then the key to it, then the proposals it was found in. */
+  for (const id of ['map-view-section', 'findings-section', 'legend-section', 'proposal-section']) {
     check(await page.locator(`#${id}`).isVisible(), `#${id} is shown now there is something in it`);
   }
+  check(await page.evaluate(() =>
+    [...document.querySelectorAll('#drawer .ridr-drawer-section')].map((s) => s.id).join(' '))
+    === 'session-section map-view-section findings-section legend-section proposal-section',
+    'and the drawer reads What differs → Legend → Proposals');
   check(await page.locator('#empty-state').isHidden(), 'and the empty state is gone');
+  check(await page.locator('#btn-briefs').isVisible(),
+    'and Briefs has appeared now that there is something to write about');
 
   /* ── the session line ────────────────────────────────────────────────────
      One sentence: the week, the count, the areas, and all three finding counts
@@ -667,15 +681,32 @@ await shot('02-demo');
 
   /* ── the live region ─────────────────────────────────────────────────────
      The canvas is invisible to a screen reader; this sentence is the whole
-     reading of what just happened for a third of this app's readers. */
-  const said = await liveText();
-  check(/12 proposals loaded for the week of 2026-09-08/.test(said),
-    `the live region said: ${JSON.stringify(said.slice(0, 140))}`);
-  check(/conflicts are listed first/.test(said),
-    'and that conflicts are listed first');
+     reading of what just happened for a third of this app's readers.
 
-  check(await page.locator('#btn-briefs').isEnabled(),
-    '#btn-briefs is enabled now that there are findings to write about');
+     TWO REGIONS, because the sr-only one is a SINGLETON that carries the most
+     recent sentence and this assertion runs after the re-check queue has
+     drained — which announces its own summary. `#findings-status` sits inside
+     its own `role="status"` wrapper and holds the session sentence for as long
+     as the session lasts, so the claim "a screen reader is told this" is true
+     of the pair; asserting it of the singleton alone would only be asserting
+     which of two announcements happened to be last. */
+  const said = await liveText();
+  const status = (await page.locator('#findings-status').textContent() ?? '').trim();
+  const heard = `${said} | ${status}`;
+  check(/12 proposals loaded for the week of 2026-09-08/.test(heard),
+    `a live region says: ${JSON.stringify(heard.slice(0, 160))}`);
+  check(/conflicts are listed first/.test(heard),
+    'and that conflicts are listed first');
+  /* ONE sentence for the whole queue, when it drains. The verdicts land seconds
+     after the list renders and outside any live region, so a screen reader was
+     never told the re-check had happened at all; twelve announcements would be
+     twelve interruptions for one fact. */
+  check(/Re-checked 12 proposals/.test(said),
+    `and the re-check queue announced once, on draining: ${JSON.stringify(said.slice(0, 160))}`);
+
+  check(await page.locator('#btn-briefs').isVisible()
+     && await page.locator('#btn-briefs').isEnabled(),
+    '#btn-briefs is shown and enabled now that there are findings to write about');
 }
 
 /* ══ § 3 · the findings ═════════════════════════════════════════════════════ */
@@ -927,6 +958,82 @@ step(4, 'the map paints it — asserted against SOURCE data, never a rendered qu
   });
   check(paintedClasses > 0, `the class fills are painting (${paintedClasses} rendered features)`);
   await shot('04-paints');
+
+  /* ── A SEAM IS DRAWN AS THE BORDER, NOT AS A CHORD ───────────────────────
+     `Run.geometry` carries every vertex between a run's ends (docs/contracts.md
+     § 5) and the map has to use it: a jurisdiction line is not straight, and
+     `seams-casing`'s five white pixels — which mean "the published map did not
+     have this step" — land in the wrong state on a chord. The vertex count is
+     half the proof; the other half is that a point ON THE REAL BORDER, further
+     from the chord than the hit tolerance, resolves to the seam. */
+  const seamProbe = await page.evaluate(() => {
+    const v = window.__viewer;
+    const seam = (v.seams ?? []).find((s) => {
+      const sides = [s.sideA?.proposal?.shortId, s.sideB?.proposal?.shortId];
+      return sides.includes('9c26907b') && sides.includes('3f4c9136');
+    });
+    if (!seam) return null;
+    const feats = (v.ctx().mapView.sourceFC('seams')?.features ?? [])
+      .filter((f) => f.properties?.id === seam.id);
+    const counts = feats.map((f) => (f.geometry?.coordinates ?? []).length);
+    /* The vertex furthest from its own run's chord, over every drawn run: the
+       point a chord misses by the most, and the one this assertion is worth
+       making at. */
+    let best = null;
+    for (const f of feats) {
+      const c = f.geometry?.coordinates ?? [];
+      if (c.length < 3) continue;
+      const [ax, ay] = c[0];
+      const [bx, by] = c[c.length - 1];
+      const chord = Math.hypot(bx - ax, by - ay) || 1;
+      for (const p of c.slice(1, -1)) {
+        const off = Math.abs((bx - ax) * (ay - p[1]) - (ax - p[0]) * (by - ay)) / chord;
+        if (!best || off > best.off) best = { point: p, off };
+      }
+    }
+    return {
+      id: seam.id, runs: counts.length, vertices: Math.max(0, ...counts),
+      point: best?.point ?? null,
+      offKm: best ? Math.round(best.off * 111.32 * 100) / 100 : 0,
+    };
+  });
+  check(!!seamProbe, 'the SD/NE seam is in the `seams` source');
+  if (seamProbe) {
+    check(seamProbe.vertices > 2,
+      `its longest drawn run carries ${seamProbe.vertices} vertices of that border, not 2 ` +
+      `(${seamProbe.runs} run features)`);
+    if (seamProbe.point) {
+      /* ZOOMED IN, because `hitTest`'s seam tolerance is SIX PIXELS converted
+         to km at the current zoom: at the national pose that is tens of km and
+         a chord would answer too. At z12 it is ~0.08 km.
+
+         THE REGIONS COME OFF FIRST, and that is not a workaround: `hitTest`
+         resolves conflict > one-sided > seam by design, both authors changed
+         ground right up to this line, so a click on the border answers with
+         the region — correctly. Emptying the findings source asks the seam
+         question alone, and the source is put back from the model. */
+      const hit = await page.evaluate((probe) => {
+        const ctx = window.__viewer.ctx();
+        const before = { center: ctx.map.getCenter(), zoom: ctx.map.getZoom() };
+        ctx.map.jumpTo({ center: probe.point, zoom: 12 });
+        const tolKm = 6 * ((40075.016686 * Math.cos((probe.point[1] * Math.PI) / 180))
+          / (512 * (2 ** ctx.map.getZoom())));
+        const withRegions = ctx.mapView.hitTest(probe.point);
+        ctx.mapView.setFindings([]);
+        const seamOnly = ctx.mapView.hitTest(probe.point);
+        ctx.mapView.setFindings((window.__viewer.findings ?? []).filter((f) => f.kind !== 'seam'));
+        ctx.map.jumpTo(before);
+        return { withRegions, seamOnly, tolKm: Math.round(tolKm * 1000) / 1000 };
+      }, seamProbe);
+      check(seamProbe.offKm > hit.tolKm,
+        `the probe point is ${seamProbe.offKm} km off the chord, past the ${hit.tolKm} km hit ` +
+        'tolerance — a chord-drawn seam could not answer here');
+      check(hit.seamOnly?.kind === 'seam' && hit.seamOnly.id === seamProbe.id,
+        `and a point on the real border hit-tests as that seam (${JSON.stringify(hit.seamOnly)}; ` +
+        `with the regions on the map the same click is ${JSON.stringify(hit.withRegions)}, which is ` +
+        'the documented precedence)');
+    }
+  }
 }
 
 /* ══ § 5 · the three views ══════════════════════════════════════════════════ */

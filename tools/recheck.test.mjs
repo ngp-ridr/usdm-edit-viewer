@@ -103,8 +103,14 @@ check(gradeEscape(0.2, RESIDUE_WIDTH_M + 1) === 'defect',
 
 console.log('\n── § 2  the sentences (docs/contracts.md § 15) ────────────────');
 
+/* WRITTEN TO A REVIEWER. It used to say "the package's own geometry agrees with
+   itself", which is a tautology to the person holding somebody else's file:
+   what they want to know is whether THIS APP re-derived the same map from the
+   bytes they were sent, which is what it actually did. */
 const passSentence = recheckSentence({ grade: 'pass', problems: [] });
-check(/agrees with itself/.test(passSentence), `pass: "${passSentence}"`);
+check(/re-derived from this file/.test(passSentence), `pass: "${passSentence}"`);
+check(!/agrees with itself/.test(passSentence),
+  'and it does not describe the file to itself');
 
 const residueSentence = recheckSentence({ grade: 'residue', problems: [], residueKm2: 0.949 });
 check(/agrees to within/.test(residueSentence) && /shared edges/.test(residueSentence),
@@ -220,6 +226,61 @@ if (!corpus.length) {
     'and at least one problem carries GEOMETRY, so the card can offer "Show me"');
   check(/problems, largest/.test(corrupted.sentence),
     `and the verdict names the count and the size: "${corrupted.sentence}"`);
+
+  /* ── § 5. A stripped justification is COMPLETENESS, not a defect ───────── */
+
+  console.log('\n── § 5  the paperwork is not the ground ───────────────────────');
+
+  /* `verifyPackage` re-runs `validateJustification` over a finished package and
+     pushes its report into the SAME `problems` array as the geometry failures.
+     Passed through, a geometrically perfect proposal with an empty
+     justification read "Re-check: 4 problems" in the drawer, and the card
+     printed the editor's own form hints at a reviewer: "Say why this edit is
+     right — a reviewer cannot act on a blank.", "Your name travels with the
+     proposal." Four imperatives addressed to somebody who is not in the room.
+
+     THE GRADE IS GEOMETRIC. This fixture takes a package that grades clean,
+     empties its justification and its author, and pins both halves: the grade
+     does not move, and the completeness is reported separately as one sentence
+     a reader can act on. */
+  const whole = graded.find((g) => g.r.grade !== 'defect');
+  const stripped = JSON.parse(JSON.stringify(whole.pkg));
+  stripped.justification = { ...(stripped.justification ?? {}), rationale: '', evidence: [] };
+  stripped.author = { name: '', email: '', affiliation: '', role: '', onBehalfOf: '' };
+
+  const bare = recheckPackage(stripped);
+  check(bare.grade === whole.r.grade,
+    `${whole.key} with an empty justification still grades \`${bare.grade}\` — ` +
+    `the same as intact (${whole.r.grade})`);
+  check(bare.problems.length === whole.r.problems.length,
+    `and carries the same ${bare.problems.length} geometric problem(s), not ` +
+    `${whole.r.problems.length + 4}`);
+  check(!bare.problems.some((p) =>
+    /Say why this edit is right|travels with the proposal/.test(p.message)),
+  'and NOT ONE of the editor’s author-facing form hints is in the problem list');
+  check(bare.completeness.includes('rationale') && bare.completeness.includes('author-name')
+    && bare.completeness.includes('author-email') && bare.completeness.includes('author-role'),
+  `the completeness list names every missing field: ${bare.completeness.join(', ')}`);
+  check(bare.completenessSentence === 'This proposal carries no rationale and no author.',
+    `and reads as ONE reader-facing sentence: "${bare.completenessSentence}"`);
+  check(/re-derived|agrees to within/.test(bare.sentence) && !/problem/.test(bare.sentence),
+    `while the verdict stays about the geometry: "${bare.sentence}"`);
+
+  /* THE OTHER DIRECTION: an intact package says nothing about paperwork. A
+     completeness line that fired on every proposal would be no line at all. */
+  check(whole.r.completeness.length === 0 && whole.r.completenessSentence === '',
+    `and the intact ${whole.key} reports no completeness problem at all`);
+
+  /* THE THREE AUTHOR FIELDS COLLAPSE TO ONE PHRASE only when all three are
+     missing — a reader told "no author, no contact address and no stated role"
+     has been told the same thing three times. One missing field is one
+     phrase. */
+  const noName = JSON.parse(JSON.stringify(whole.pkg));
+  noName.author = { ...(noName.author ?? {}), name: '' };
+  const named = recheckPackage(noName);
+  check(named.completenessSentence === 'This proposal carries no author.',
+    `one missing field is one phrase: "${named.completenessSentence}"`);
+  check(named.grade === whole.r.grade, 'and the grade still has not moved');
 }
 
 console.log(`\n${failures === 0 ? '✓ all checks passed' : `✗ ${failures} check(s) failed`}`);

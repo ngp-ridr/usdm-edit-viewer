@@ -57,6 +57,23 @@
    AND by the shape of the sentence, because the two computations are the same
    code over the same bytes and the strings agree.
 
+   ── COMPLETENESS IS NOT GEOMETRY, AND THE GRADE IS GEOMETRIC ───────────────
+   `verifyPackage` also re-runs `validateJustification` over a finished package
+   and pushes ITS report into the same `problems` array. Those sentences are the
+   editor's FORM HINTS, written to an author in front of the form — "Say why
+   this edit is right — a reviewer cannot act on a blank.", "Your name travels
+   with the proposal." Passed through here they made a geometrically perfect
+   package read "Re-check: 4 problems" and printed four imperatives at a
+   reviewer who cannot act on any of them.
+
+   So this module re-runs `validateJustification` ITSELF (the same call
+   `verifyPackage` makes, over `{...justification, author}`), takes its
+   sentences out of `problems` by exact string, and reports them as a separate
+   `completeness` list of KEYS with ONE reader-facing sentence beside it:
+   "This proposal carries no rationale and no author." The GRADE
+   (pass/residue/defect) never sees them — it is a statement about geometry,
+   and a missing email is not a defect in the ground.
+
    ── ITS PLACE IN THE ENGINE ────────────────────────────────────────────────
    docs/contracts.md § 2 gives `js/proposal.js` a `checkIntegrity(p)` with this
    grading in it. THE IMPLEMENTATION LIVES HERE, once: `checkIntegrity` is
@@ -66,12 +83,17 @@
    ========================================================================== */
 
 import { verifyPackage } from '../vendor/usdm-editor/js/submit.js';
+/* The SAME call `verifyPackage` makes over a finished package — see the header.
+   It is a pure function in a module the graph already loads (js/submit.js
+   imports it), so this costs no new dependency and cannot drift from the
+   sentences it is filtering. */
+import { validateJustification } from '../vendor/usdm-editor/js/justify.js';
 import {
   areaKm2, deriveContours, meanWidthM, ruleContainedIn,
   CONTAINMENT_TOLERANCE_M2, RESIDUE_WIDTH_M,
 } from '../vendor/usdm-editor/js/topology.js';
 import { CLASSES } from '../vendor/usdm-editor/js/color.js';
-import { fmtMi2, fmtMi2Fine, km2ToMi2, MI2 } from '../vendor/usdm-editor/js/units.js';
+import { fmtMi, fmtMi2, fmtMi2Fine, km2ToMi2, MI2 } from '../vendor/usdm-editor/js/units.js';
 
 /**
  * The area bar for residue, in km².
@@ -158,6 +180,111 @@ function isMutualContainmentMessage(message) {
     && /(?:falls outside|exists where there is no)/.test(String(message ?? ''));
 }
 
+/* ── completeness: the paperwork, which is not the ground ─────────────────── */
+
+/**
+ * What a reader is told about each missing piece of paperwork.
+ *
+ * The KEYS are `validateJustification`'s; the phrases are written to a READER
+ * rather than to the author in front of the form — nobody looking at somebody
+ * else's proposal can act on "Your name travels with the proposal."
+ */
+const COMPLETENESS_PHRASES = Object.freeze({
+  rationale: 'no rationale',
+  'author-name': 'no author',
+  'author-email': 'no contact address',
+  'author-role': 'no stated role',
+  evidence: 'a piece of evidence that could not be read',
+});
+
+/**
+ * `validateJustification`'s report over a finished package.
+ *
+ * Byte-for-byte the call `verifyPackage` makes (vendored js/submit.js), so the
+ * sentences this returns are exactly the ones in its `problems` array and the
+ * filter below is an identity rather than a guess.
+ *
+ * @param {object} pkg
+ * @returns {Record<string,string>} field key → the editor's own author-facing
+ *          sentence
+ */
+export function justificationReport(pkg) {
+  try {
+    return validateJustification(pkg?.justification
+      ? { ...pkg.justification, author: pkg.author } : {}) ?? {};
+  } catch {
+    /* A package is arbitrary bytes somebody chose. A throw here means nothing
+       could be said about the paperwork, which is not the same as saying the
+       paperwork is complete — but it is not a geometry defect either, and the
+       geometry is what this module grades. */
+    return {};
+  }
+}
+
+/**
+ * The ONE sentence a reader gets for a package missing its paperwork.
+ *
+ * `['rationale', 'author-name', 'author-email', 'author-role']` →
+ * "This proposal carries no rationale and no author." The three author fields
+ * collapse to ONE phrase when all three are missing: a stripped justification
+ * is one fact about the file, not three, and a reader who is told "no author,
+ * no contact address and no stated role" has been told the same thing three
+ * times.
+ *
+ * @param {string[]} keys `validateJustification` keys
+ * @returns {string} the sentence, or `''` when nothing is missing
+ */
+export function completenessSentence(keys) {
+  const set = new Set(keys ?? []);
+  if (!set.size) return '';
+  const authorKeys = ['author-name', 'author-email', 'author-role'];
+  const phrases = [];
+  if (set.has('rationale')) phrases.push(COMPLETENESS_PHRASES.rationale);
+  if (authorKeys.every((k) => set.has(k))) {
+    phrases.push(COMPLETENESS_PHRASES['author-name']);
+  } else {
+    for (const k of authorKeys) if (set.has(k)) phrases.push(COMPLETENESS_PHRASES[k]);
+  }
+  if ([...set].some((k) => k.startsWith('evidence'))) phrases.push(COMPLETENESS_PHRASES.evidence);
+  if (!phrases.length) return '';
+  const joined = phrases.length === 1
+    ? phrases[0]
+    : `${phrases.slice(0, -1).join(', ')} and ${phrases[phrases.length - 1]}`;
+  return `This proposal carries ${joined}.`;
+}
+
+/* ── the vendored sentences, in the units a reader reads ──────────────────── */
+
+/**
+ * A verifier sentence, in miles.
+ *
+ * `validateDerivedBands` writes its overlap failure with `fmtMi2Fine` and
+ * `fmtFt` (vendored js/topology.js), which on a real defect prints
+ * "7,605.49 mi² (mean width 61,460 ft)" — two decimal places on a number the
+ * size of Massachusetts, and a width in feet that is eleven miles. The numbers
+ * are right; the RESOLUTION is written for a sliver. This rewrites the two
+ * spellings in place rather than touching the vendored copy, which is
+ * byte-pinned and may never be edited.
+ *
+ * Both rules are one-way and lossy on purpose: a foot measurement under a mile
+ * stays in feet (that is what residue is measured in) and a fine area under
+ * 100 mi² keeps its decimals (`fmtMi2`'s own rule).
+ */
+export function readableMessage(message) {
+  return String(message ?? '')
+    .replace(/([\d,]+(?:\.\d+)?)\s*ft\b/g, (whole, num) => {
+      const ft = Number(String(num).replace(/,/g, ''));
+      if (!Number.isFinite(ft) || ft < 5280) return whole;
+      /* fmtMi takes km; feet → km is the same constant js/units.js carries. */
+      return `${fmtMi((ft * 0.3048) / 1000)} mi`;
+    })
+    .replace(/([\d,]+\.\d+)\s*mi²/g, (whole, num) => {
+      const mi2 = Number(String(num).replace(/,/g, ''));
+      if (!Number.isFinite(mi2) || mi2 < 100) return whole;
+      return `${mi2.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${MI2}`;
+    });
+}
+
 /* ── the verdict ──────────────────────────────────────────────────────────── */
 
 /**
@@ -175,13 +302,26 @@ function isMutualContainmentMessage(message) {
  * never has to ask which shape it got. `areaKm2`/`geometry` are null on a
  * problem that is about shape rather than ground (a missing id, an unparseable
  * justification); the card offers "Show me" only where there is geometry.
+ *
+ * `completeness` is the PAPERWORK, partitioned out (see the header): a list of
+ * `validateJustification` keys with one reader-facing sentence in
+ * `completenessSentence`. It never moves the grade — `ok` and `grade` are
+ * statements about geometry, and a proposal with no email re-derives exactly.
  */
 export function recheckPackage(pkg) {
   const v = safeVerify(pkg);
 
+  /* THE PAPERWORK, out of the geometry's way. `verifyPackage` pushes
+     `validateJustification`'s whole report into `problems`; the same call made
+     here gives the exact strings to take back out. */
+  const report = justificationReport(pkg);
+  const completeness = Object.keys(report);
+  const authoringSentences = new Set(Object.values(report));
+
   /* Split the copy's own problems: containment sentences are re-derived here
      with their geometry, everything else passes through as it was written. */
-  const others = v.problems.filter((m) => !isMutualContainmentMessage(m));
+  const others = v.problems.filter((m) =>
+    !isMutualContainmentMessage(m) && !authoringSentences.has(m));
   const containmentProblems = v.problems.filter((m) => isMutualContainmentMessage(m));
 
   /* The fast path is the new copy on a clean or residue-only file: its
@@ -219,7 +359,9 @@ export function recheckPackage(pkg) {
   }
 
   for (const m of others) {
-    problems.push({ message: m, class: null, areaKm2: null, widthM: null, geometry: null });
+    problems.push({
+      message: readableMessage(m), class: null, areaKm2: null, widthM: null, geometry: null,
+    });
   }
 
   /* Largest first: a reviewer reads two problems and stops, so the two they
@@ -234,10 +376,13 @@ export function recheckPackage(pkg) {
   const residueKm2 = residue.reduce((a, r) => a + (r.areaKm2 ?? 0), 0);
   const residueWidestM = residue.reduce((m, r) => Math.max(m, r.widthM ?? 0), 0);
 
+  /* GEOMETRIC, and `completeness` is deliberately not in it. */
   const grade = problems.length ? 'defect' : (residue.length ? 'residue' : 'pass');
   const result = {
     grade, ok: problems.length === 0, problems, residue,
     largestKm2, residueKm2, residueWidestM,
+    completeness,
+    completenessSentence: completenessSentence(completeness),
     gates: v.gates ?? null,
   };
   result.sentence = recheckSentence(result);
@@ -263,8 +408,14 @@ export function recheckPackage(pkg) {
  */
 export function normalizeRecheck(r) {
   if (!r) return null;
-  /* Already ours: `residue` split out and a sentence written. */
-  if (Array.isArray(r.residue) && typeof r.sentence === 'string') return r;
+  /* Already ours: `residue` split out and a sentence written. An older shape
+     may predate the completeness split, so the two keys are FILLED IN rather
+     than assumed — a panel reading `undefined.length` is the whole row gone. */
+  if (Array.isArray(r.residue) && typeof r.sentence === 'string') {
+    if (Array.isArray(r.completeness) && typeof r.completenessSentence === 'string') return r;
+    const completeness = Array.isArray(r.completeness) ? r.completeness : [];
+    return { ...r, completeness, completenessSentence: completenessSentence(completeness) };
+  }
 
   const rows = (Array.isArray(r.problems) ? r.problems : []).map((p) => (typeof p === 'string'
     ? { message: p, class: null, areaKm2: null, widthM: null, geometry: null, grade: 'defect' }
@@ -276,11 +427,14 @@ export function normalizeRecheck(r) {
     message: p.message ?? '',
   }));
   const problems = rows.filter((p) => p.grade !== 'residue');
+  const completeness = Array.isArray(r.completeness) ? r.completeness : [];
   const out = {
     grade: r.grade ?? (problems.length ? 'defect' : residue.length ? 'residue' : 'pass'),
     ok: problems.length === 0,
     problems,
     residue,
+    completeness,
+    completenessSentence: r.completenessSentence ?? completenessSentence(completeness),
     largestKm2: problems.reduce((m, p) => Math.max(m, p.areaKm2 ?? 0), 0),
     residueKm2: r.escapedKm2 ?? residue.reduce((a, x) => a + (x.areaKm2 ?? 0), 0),
     residueWidestM: residue.reduce((m, x) => Math.max(m, x.widthM ?? 0), 0),
@@ -307,7 +461,11 @@ export function normalizeRecheck(r) {
  */
 export function recheckSentence(r) {
   if (!r) return '';
-  if (r.grade === 'pass') return 'Re-check: the package’s own geometry agrees with itself.';
+  /* WRITTEN TO A REVIEWER, not to the file. "The package's own geometry agrees
+     with itself" reads as a tautology to the person holding somebody else's
+     proposal; what they want to know is whether this app re-derived the same
+     map from the bytes they were sent. */
+  if (r.grade === 'pass') return 'Re-check: re-derived from this file and it matches exactly.';
   if (r.grade === 'residue') {
     const total = r.residueKm2 ?? r.escapedKm2 ?? 0;
     /* `fmtMi2Fine` resolves to a hundredth of a square mile and most of these

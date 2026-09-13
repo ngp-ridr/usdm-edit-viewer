@@ -11,10 +11,19 @@
    separator, the working-area dim, the reference boundary grades, the labels
    raised last, the three display modes — is called, not copied. What is added
    here is what a reconciliation view needs and a single-author editor never
-   did. `usdm-changes`, `usdm-delta` and the two `band-*` sources stay EMPTY in
-   this app: they are the editor's surfaces (the change map, the scoped-verb
-   reach mask), nothing here ever feeds them, and an empty source is cheaper
-   than a fork.
+   did. `usdm-changes` and `usdm-delta` stay EMPTY in this app: they are the
+   editor's change surfaces, this app's Differences view is `setMapView(
+   'changes')` over them, and an empty source is cheaper than a fork.
+
+   THE FOUR `band-*` ENTRIES ARE TAKEN BACK OFF, and the doctrine is worth
+   stating because it is the general answer to "the vendored stack builds
+   something this app cannot use": `band-dim`/`band-line` over
+   `band-mask`/`band-reach` show the band a SCOPED VERB can reach while one is
+   armed. This app arms nothing. `createLayerStack` is byte-identical by rule
+   and offers no flag to skip them, so `dropEditorOnlyBandLayers()` removes the
+   pair and their sources immediately after `addAll()` — after, so the vendored
+   file is untouched and a re-sync keeps working. See that function for why
+   every vendored caller survives it.
 
    ── THE LADDER AS BUILT, bottom to top ─────────────────────────────────────
      CARTO Positron ground · hillshade
@@ -24,7 +33,8 @@
      findings-fill                        ← ours, before hillshade-over
      hillshade-over
      ── the basemap's first symbol layer (the anchor) ──
-     water · aoi-dim · band-dim · boundary-county/-state/-nation/-aiannh
+     water · aoi-dim · boundary-county/-state/-nation/-aiannh
+                                          (band-dim/band-line removed here)
      changes-line-*  (empty, the editor's)
      aoi-line-casing · aoi-line
      ── everything below inserts before the first RAISED place_/watername_ ──
@@ -259,10 +269,39 @@ export function createMapView(map, {
 
   /** Add every viewer layer and paint whatever the caller has handed over. */
   function attach() {
+    dropEditorOnlyBandLayers();
     addViewerLayers();
     added = true;
     repaintAll();
     return surface;
+  }
+
+  /**
+   * The scoped-verb reach mask, removed rather than forked.
+   *
+   * `band-dim` / `band-line` (over `band-mask` / `band-reach`) are the
+   * editor's: they show which band a scoped Improve or Degrade can reach while
+   * one is ARMED. This app arms nothing — it never edits and has no verbs — so
+   * nothing here can ever feed them, and four style entries MapLibre walks
+   * every frame is four it walks for nothing.
+   *
+   * TAKEN OFF AFTER `addAll()`, NEVER TRIMMED OUT OF IT. `createLayerStack` is
+   * vendored byte-identical (CLAUDE.md's first rule) and takes no composition
+   * flag for this; the alternative to these four lines is a fork, which is a
+   * copy nobody can re-sync. Layers before sources — MapLibre refuses to remove
+   * a source a layer still reads — and every vendored caller survives it:
+   * `renderBandMask` is `getSource(id)?.setData(…)` and `restyleForTheme`
+   * guards each paint with `getLayer(id)`, so both become no-ops rather than
+   * throws. `usdm-changes` and `usdm-delta` STAY: the editor's change view is
+   * `setMapView('changes')`, which this app's Differences view maps onto.
+   */
+  function dropEditorOnlyBandLayers() {
+    for (const id of ['band-dim', 'band-line']) {
+      if (map.getLayer(id)) map.removeLayer(id);
+    }
+    for (const id of ['band-mask', 'band-reach']) {
+      if (map.getSource(id)) map.removeSource(id);
+    }
   }
 
   /* ══ Adding the layers ════════════════════════════════════════════════════ */
@@ -761,12 +800,20 @@ export function createMapView(map, {
    * The padding clears the docked card or the bottom sheet, because a fit that
    * puts its subject under the thing that opened it is a fit that did nothing.
    * `maxZoom` is what stops a 20 km² region becoming a street map.
+   *
+   * REDUCED MOTION IS HONOURED HERE AND NOT IN CSS. A camera flight is a
+   * six-hundred-millisecond zoom of the whole viewport — the largest motion
+   * this app makes, and the one a vestibular reader is most likely to have
+   * asked not to be shown — but it is drawn into a canvas, where
+   * `prefers-reduced-motion` in a stylesheet cannot reach it. The answer is the
+   * same either way: the fit still happens, it just arrives rather than
+   * travels.
    */
   function focus(target, { base = 32, maxZoom = 10, duration = 600 } = {}) {
     const bbox = bboxOf(target);
     if (!bbox) return null;
     map.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], {
-      padding: fitPadding(base), maxZoom, duration,
+      padding: fitPadding(base), maxZoom, duration, animate: !prefersReducedMotion(),
     });
     return bbox;
   }
@@ -835,16 +882,34 @@ export function createMapView(map, {
     return null;
   }
 
-  /** The seam whose line passes within `SEAM_HIT_PX` of the point, nearest
-   *  first — a shared line may carry two seams where two proposals meet. */
+  /**
+   * The seam whose line passes within `SEAM_HIT_PX` of the point, nearest
+   * first — a shared line may carry two seams where two proposals meet.
+   *
+   * BBOX FIRST, like every other hit test in this module. `pointToLineDistance`
+   * walks every segment of a line, and a run's line is now the BORDER rather
+   * than a two-point chord (`seamPieces`) — hundreds of vertices per run,
+   * thousands per session — so the prefilter went from an optimisation over
+   * twenty two-point lines to the same thing `covers()` does for polygons. The
+   * box is grown by the tolerance in DEGREES at this latitude, so a point just
+   * outside a line's envelope but well within six pixels of it is still tested.
+   */
   function seamUnder(pt) {
     const turf = T();
     const tolerance = SEAM_HIT_PX * kmPerPixel(pt[1]);
+    /* Latitude first, then longitude widened by the convergence of the
+       meridians — a degree of longitude is a kilometre less the further north
+       the border runs, and the SD/NE line is at 43°. */
+    const padY = tolerance / 111.32;
+    const padX = padY / Math.max(0.1, Math.cos((pt[1] * Math.PI) / 180));
+    const near = [pt[0] - padX, pt[1] - padY, pt[0] + padX, pt[1] + padY];
     let best = null;
     for (const s of state.seams) {
       for (const piece of seamPieces(s)) {
         for (const line of lineStringsOf(piece.geometry)) {
           if (line.length < 2) continue;
+          const box = bboxOfCoordinates(line);
+          if (box && !bboxOverlaps(near, box)) continue;
           let km;
           try {
             km = turf.pointToLineDistance(turf.point(pt), turf.lineString(line), { units: 'kilometers' });
@@ -912,6 +977,17 @@ export function createMapView(map, {
    * leaves `agree` and `pre-existing` off, which is what makes a white
    * `isNew` casing mean something when it appears.
    *
+   * A RUN IS DRAWN AS THE BORDER, NEVER AS THE CHORD BETWEEN ITS ENDS.
+   * `Run.geometry` is this run's own stretch of the line, every vertex of it,
+   * and js/seams.js computes it with `sliceString` for exactly this
+   * (docs/contracts.md § 5). A jurisdiction line is not straight — the
+   * Missouri carries the SD/NE border for 200 km — so a two-point chord draws
+   * the seam through the wrong state, and `seams-casing`'s five white pixels,
+   * which mean "the published map did not have this step", land on ground
+   * neither author was talking about. `[from, to]` survives as the fallback
+   * for a run that carries no geometry, which is a straight two-point line
+   * drawn honestly rather than nothing at all.
+   *
    * Falls back, in order, to a geometry the engine attached (`geometry`, then
    * `line`), then to the edge effects' own `segments`. THE FALLBACK IS NOT
    * DECORATION: a seam whose far side is the published week may have no runs at
@@ -920,10 +996,10 @@ export function createMapView(map, {
   function seamPieces(seam) {
     const runs = Array.isArray(seam?.runs) ? seam.runs : [];
     const marked = runs.filter((r) => r && r.kind !== 'agree' && r.kind !== 'pre-existing');
-    const withEnds = marked.filter((r) => Array.isArray(r.from) && Array.isArray(r.to));
-    if (withEnds.length) {
-      return withEnds.map((r) => ({
-        geometry: { type: 'LineString', coordinates: [r.from, r.to] },
+    const drawable = marked.filter((r) => runCoordinates(r).length >= 2);
+    if (drawable.length) {
+      return drawable.map((r) => ({
+        geometry: { type: 'LineString', coordinates: runCoordinates(r) },
         isNew: r.kind === 'new',
         step: r.step ?? null,
         lengthKm: r.lengthKm ?? null,
@@ -937,6 +1013,20 @@ export function createMapView(map, {
       step: seam?.maxStep ?? null,
       lengthKm: seam?.lengthKm ?? null,
     }];
+  }
+
+  /**
+   * A run's coordinates: its own stretch of the border, or the chord.
+   *
+   * `r.geometry?.coordinates ?? [r.from, r.to]` with the ends checked, because
+   * a run that carries neither is not drawable at all and must not become a
+   * `LineString` with an `undefined` in it — MapLibre answers that by dropping
+   * the whole source, silently.
+   */
+  function runCoordinates(run) {
+    const coords = run?.geometry?.coordinates;
+    if (Array.isArray(coords) && coords.length >= 2) return coords;
+    return (Array.isArray(run?.from) && Array.isArray(run?.to)) ? [run.from, run.to] : [];
   }
 
   /** Every `edgeEffects[].segments` on a seam, as one MultiLineString. */
@@ -1164,6 +1254,22 @@ function bboxOfCoordinates(coords) {
 /** Uniform padding — the default when the caller has no card to clear. */
 function uniformPadding(base) {
   return { top: base, right: base, bottom: base, left: base };
+}
+
+/**
+ * Has this reader asked for less motion?
+ *
+ * READ AT EVERY FIT, never cached: the setting is a system preference a reader
+ * can change while the page is open, and a value captured at boot would keep
+ * flying the camera at somebody who has just turned it off. Guarded, because
+ * `matchMedia` is absent under Node, where this module's helpers are read.
+ */
+function prefersReducedMotion() {
+  try {
+    return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+  } catch {
+    return false;
+  }
 }
 
 /** `performance.now()` where there is one, `Date.now()` where there is not. */

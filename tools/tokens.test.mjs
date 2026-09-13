@@ -143,12 +143,23 @@ const used = new Set();
 for (const m of appSrc.matchAll(/var\((--[a-z0-9-]+)/gi)) used.add(m[1]);
 for (const m of appSrc.matchAll(/cssVar\(\s*['"](--[a-z0-9-]+)['"]/gi)) used.add(m[1]);
 
+/* The theme's tokens, PLUS any custom property css/app.css declares for itself.
+   The rule this check enforces is "no `var()` pointing at nothing" — not "every
+   property is the kit's". An app legitimately owns a measurement of its own:
+   `--app-footer-h` is the height of THIS app's footer, which the kit cannot
+   know and which two rules here have to agree about (the footer and the toast
+   that clears it). App-owned properties are spelled `--app-*` so a reader can
+   tell at a glance which side of the line one is on. */
+const appDefined = [...readFileSync(join(ROOT, APP_CSS), 'utf8')
+  .matchAll(/(--app-[a-z0-9-]+)\s*:/gi)].map((m) => m[1]);
 const allDefined = new Set([...Object.keys(light), ...Object.keys(hc),
-  ...[...text.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1])]);
+  ...[...text.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1]),
+  ...appDefined]);
 const missing = [...used].filter((t) => !allDefined.has(t));
 check(missing.length === 0,
   `all ${used.size} token(s) referenced by the app are defined` +
-  (missing.length ? ` — MISSING: ${missing.join(', ')}` : ''));
+  (missing.length ? ` — MISSING: ${missing.join(', ')}` : '') +
+  (appDefined.length ? ` (${appDefined.length} app-owned: ${[...new Set(appDefined)].join(', ')})` : ''));
 
 console.log('\n── theme parity ────────────────────────────────────────────');
 const INDEPENDENT = new Set(['--font-ui', '--font-serif', '--font-mono', '--heading-weight',

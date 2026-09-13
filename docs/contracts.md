@@ -209,6 +209,26 @@ re-sync from editor `a6620a5` it returns `{ok, problems, residue, gates}` and ha
 applied the WIDTH channel itself, so a residue-scale escape arrives in `residue`
 rather than `problems`; the area bar above is still applied here.
 
+**COMPLETENESS IS PARTITIONED OUT, AND THE GRADE IS GEOMETRIC.** `verifyPackage`
+also re-runs `validateJustification` over the finished package and pushes ITS
+report into the same `problems` array. Those sentences are the editor's form
+hints, addressed to an author standing in front of a form — "Say why this edit is
+right — a reviewer cannot act on a blank.", "Your name travels with the
+proposal." Passed through, a geometrically perfect package read "Re-check: 4
+problems" and the card printed four imperatives at a reviewer who cannot act on
+any of them. `js/recheck.js` makes the same `validateJustification` call itself,
+takes those exact strings back out of `problems`, and reports them as two more
+fields carried on both shapes:
+
+| field | |
+|---|---|
+| `completeness: string[]` | the `validateJustification` keys that are missing — `rationale`, `author-name`, `author-email`, `author-role`, `evidence-<i>` |
+| `completenessSentence: string` | ONE reader-facing sentence, or `''` — "This proposal carries no rationale and no author." The three author fields collapse to one phrase when all three are missing. |
+
+Neither moves `grade` or `ok`: a proposal with no email re-derives exactly.
+`tools/recheck.test.mjs` § 5 pins both halves with a stripped-justification
+fixture.
+
 **Where the bar lives (WP-D and WP-E, agreed):** § 11 calls `js/recheck.js` "a
 thin wrapper over `checkIntegrity`" and it is written **the other way round** —
 `recheckPackage` holds the one copy of the magnitude bar, the residue/defect
@@ -273,7 +293,16 @@ DOM-free.
 compareProposals(A, B, { ground, minAreaM2 = MIN_PATCH_AREA_M2 })
   → { pair: [A.id, B.id], ground, regions: Region[], totals, ms }
 compareGroup(proposals, { ground }) → Comparison[]   // all C(n,2) pairs
+groupPairs(proposals, { crossAoi }) → [A, B][]       // the same pairs, uncompared
 ```
+
+`groupPairs` is the pair list without the work, and it exists so the CROSS-AOI
+SKIP RULE has one copy: js/app.js walks it and calls `compareProposals` itself
+with a `setTimeout(0)` between pairs, because a pair is 230–700 ms of
+synchronous clipper work and yielding per GROUP held the main thread through ten
+of them (js/app.js's header carries the input-latency measurements). This module
+stays synchronous and Node-testable; an async `onPair` hook here would have
+ended that.
 
 ```js
 totals = { conflictKm2, oneSidedKm2: { A, B }, publishedMismatchKm2 }
@@ -765,16 +794,28 @@ indistinguishable from a broken map.
 week, punched by the picked proposal's AOI), `usdm-edit` (the picked proposal's
 `derivedBands`), `aoi` / `aoi-mask` (fed the UNION of every loaded AOI, so the
 mask dims the world outside the set and `aoi-line` draws every loaded boundary),
-`boundaries`, `county-tiles`, `tribal-boundaries`. `usdm-changes`, `usdm-delta`
-and the `band-*` sources stay empty in this app, and `js/map.js` says so in a
-comment — they are the editor's, and an empty source is cheaper than a fork.
+`boundaries`, `county-tiles`, `tribal-boundaries`. `usdm-changes` and
+`usdm-delta` stay empty in this app, and `js/map.js` says so in a comment — they
+are the editor's change surfaces, this app's Differences view is
+`setMapView('changes')` over them, and an empty source is cheaper than a fork.
+
+**The four `band-*` entries are REMOVED, right after `addAll()`.**
+`band-dim`/`band-line` over `band-mask`/`band-reach` show the band a scoped verb
+can reach while one is ARMED, and this app arms nothing — so they are four style
+entries MapLibre walks every frame for something that can never happen.
+`createLayerStack` is vendored byte-identical and offers no flag to skip them,
+so `js/map.js`'s `dropEditorOnlyBandLayers()` takes them off after the stack is
+up: layers before sources, and both vendored callers survive it
+(`renderBandMask` is `getSource(id)?.setData`, `restyleForTheme` guards every
+paint with `getLayer(id)`). Removing after is the general answer here; editing
+the copy is never one.
 
 **Viewer sources:**
 
 | source | feature properties |
 |---|---|
 | `findings` | `{ id, kind, delta, magnitude, areaKm2, aoiId }` |
-| `seams` | `{ id, kind, isNew, step, lengthKm }` |
+| `seams` | `{ id, kind, isNew, step, lengthKm }` — one feature per reportable RUN, its geometry `Run.geometry` (§ 5): every vertex of that stretch of the border, never the `from`→`to` chord |
 | `patches` | `{ proposalId, key, seq, mark, letter }` |
 | `anchors` | `{ letter }` (points) |
 
@@ -844,13 +885,19 @@ createPanels(els, ctx, handlers?) → {
   destroy(),                     // cancels the deferred re-check queue
 }
 
-handlers = { onToggleShown(ids), onOpenProposal(p), onOpenFinding(f) }
+handlers = { onToggleShown(ids), onOpenProposal(p), onOpenFinding(f),
+             onActivateRow(target) }
 ```
 
 **Three additions to the frozen surface, and one optional argument (WP-D).**
 `handlers` is how js/app.js wires the drawer's three verbs explicitly; each falls
 back to `ctx` (`setShown`, `openProposal`, `select`) when it is absent, so the
-two-argument call above still works unchanged. `setSelection` and
+two-argument call above still works unchanged. `onActivateRow` is the fourth and
+has no `ctx` fallback: it runs BEFORE either open, and js/app.js uses it to close
+the compact drawer — on a phone the drawer is an overlay over the map and the
+card is a bottom sheet UNDER it, so a finding opened from the list arrived behind
+the panel it was opened from. The panel does not know what compact is; the app
+does. `setSelection` and
 `repaintDimming` exist because neither is a render: a selection moving and a
 checkbox moving each change ONE attribute per row, and rebuilding forty rows to
 move one `aria-current` would throw away the reader's scroll position and their
@@ -1003,7 +1050,7 @@ ctx = Object.freeze({
   get selection(),               // { kind, id } | null
   get viewerUrl(),               // location.origin + location.pathname
 
-  setView(v), setPick(id), setShown(ids), select(sel | null),
+  setView(v), setPick(id), setShown({ ids, all } | ids[] | null), select(sel | null),
   focus(target),
   say(sentence),                 // ONE toast (the kit's showToast is a singleton)
   live(sentence),                // the polite live region
@@ -1026,6 +1073,30 @@ empty one. The alternative, holding the full list, makes the DEFAULT a thing tha
 has to be rewritten on every load and re-derived on every comparison; and it
 would put twelve shortIds in the address bar of a session nobody has narrowed,
 where § 14 says a view at defaults emits nothing at all.
+
+**So a caller that has checkboxes says which it means.** `ctx.setShown` takes
+three shapes and they are not interchangeable:
+
+| argument | meaning |
+|---|---|
+| `{ ids, all }` | the panel's: `all: true` is every proposal, `all: false` with an empty `ids` is NONE |
+| `ids[]` | the legacy reading — empty means every proposal |
+| `null` | every proposal |
+
+`js/panels.js`'s ONE call site (`onShownChanged`) passes `{ ids, all }`, because
+"all twelve ticked" and "none ticked" both arrive as `[]` and the app answered
+both by showing everything: unticking the last box left a drawer with nothing
+ticked, no `?show=`, no finding dimmed, and a live region saying "Showing every
+loaded proposal".
+
+**The last untick is REFUSED, with a sentence** — "At least one proposal stays
+shown — for the week with nothing drawn over it, use the Published view." The
+other half of the choice (hide everything, announce it) needs a third state that
+`js/map.js`, `js/panels.js`'s `isShown`, the dimming and `?show=` would all have
+to learn, where today there are two and exactly one spelling of the default; and
+what it buys is the published week with no marks on it, which is the Published
+view, one control away. `setShown` re-renders the rows from the model and
+restores focus by id, so the box springs back under the reader's finger.
 
 **The `summary` object `renderSession` is handed (WP-B and WP-D):**
 
@@ -1165,14 +1236,40 @@ query string**, camera included.
 
 | param | values | notes |
 |---|---|---|
-| `?load=` | comma-separated urls | origin must be `location.origin` or `https://data.sustainable-fsa.com`, **checked before the fetch** |
+| `?load=` | comma-separated urls | origin must be `location.origin` or `https://data.sustainable-fsa.com`, **checked before the fetch**; re-emitted only when it loaded something |
 | `?demo` | present | the bundled demo set |
 | `?view=` | `published` \| `differences` | `proposal` is the default and emits nothing |
 | `?pick=` | `<shortId>` | 8 hex of `pkg.id`, 12 on collision |
 | `?show=` | comma-separated shortIds | emitted only when NOT all are shown |
-| `?focus=` | a finding id (§ 8) | briefs link back through this |
+| `?focus=` | a finding id (§ 8) | `disc:` / `seam:` **only**; briefs link back through this |
+| `?proposal=` | `<shortId>` | a proposal's card, opened at boot |
+| `?change=` | `<patchKey>` | one change's card, opened at boot |
 | `?theme=` | `light` | high-contrast is the default; this is the only route back, and the anti-flash boot reads the URL and nothing else |
 | `?drawer=` | `closed` | desktop only, and only when closed |
+
+**The three selection parameters are three because their values are three
+different things.** A selection is one of `conflict` / `one-sided` / `seam` /
+`change` / `proposal`, and only the first three have ids `findingById` can
+resolve. Emitting a proposal's uuid or a patch key as `?focus=` produced a link
+the app REFUSED on reload — "That link points at a finding this set does not
+contain", about a finding that never was one. At boot the first of
+`focus` → `proposal` → `change` that resolves wins; only one thing can be open.
+
+**A value that names nothing gets a sentence, and all of them share ONE toast.**
+A stale `?pick=` used to be dropped in silence while proposal A was painted
+instead, which is a shared link showing a different author's work with nothing
+to say so; `?show=` was the same with a wider set than the link promised. Each
+clause names its parameter's subject and what is on screen instead (§ 15).
+
+**`/` and `,` are emitted literally.** `replaceUrlState` hands the object to
+`URLSearchParams`, which percent-encodes both, so a two-file `?load=` came back
+as `demo%2Fa.json.gz%2Cdemo%2Fb.json.gz`; `js/app.js`'s `readableSeparators()`
+puts them back after every write. Both are legal unencoded in a query, this
+app's only Share is the address bar, and nothing in this grammar carries either
+character as data — shortIds are hex, finding ids are a prefix plus hex, a patch
+key is a uuid, and `?load=`/`?show=` are lists this app splits on the comma
+itself. `&` and `=` stay encoded, which is what keeps a url with its own query
+string inside `?load=` intact.
 
 **The camera is ephemeral.** It fits the loaded AOIs, or the `?focus=` finding. A
 shared link opens on the comparison, not on somebody's pan.
@@ -1210,7 +1307,15 @@ the live region only.
 | every file a duplicate (e.g. Demo pressed twice) | "Those N proposals are already loaded." — one toast, nothing painted over the map; a lone duplicate keeps the singular sentence; duplicates mixed with new loads: "N proposals loaded; M were already loaded." |
 | reissued baseline | "\<Author\>'s proposal was drawn against a re-issued copy of the same week; it is loaded, and small differences along shared edges may be the baseline rather than the proposal." |
 | unknown `?focus=` | "That link points at a finding this set does not contain." |
+| unknown `?proposal=` / `?change=` | the same sentence, naming a proposal / a change |
+| unknown `?pick=` | "That link named a proposal this set does not contain — showing \<letter\>." |
+| unknown `?show=` ids | "That link asked to show N proposals this set does not contain — showing the M it does." · none of them known: "…— showing every one." |
 | refused `?load=` origin | "\<origin\> is not an origin this tool will fetch from." |
+| unticking the last proposal | "At least one proposal stays shown — for the week with nothing drawn over it, use the Published view." (§ 12) |
+
+Every stale-URL clause above is ONE toast however many parameters were stale —
+the kit's `showToast` is a singleton, so three toasts means a reader sees the
+third.
 
 ### Findings and sides
 
@@ -1227,9 +1332,25 @@ the live region only.
 
 | grade | sentence |
 |---|---|
-| `pass` | "Re-check: the package's own geometry agrees with itself." |
+| `pass` | "Re-check: re-derived from this file and it matches exactly." |
 | `residue` | "Re-check: agrees to within \<n\> mi² along shared edges — clipper residue, not an edit." |
 | `defect` | "Re-check: \<n\> problems, largest \<n\> mi²." |
+
+All three are **written to a reviewer**. `pass` used to say "the package's own
+geometry agrees with itself", which is a tautology to somebody holding a file
+they did not write: what they want to know is whether this app re-derived the
+same map from the bytes they were sent.
+
+A package missing its paperwork adds ONE more sentence beside the verdict — never
+instead of it, and never the editor's author-facing form hints:
+
+- "This proposal carries no rationale and no author." (`completenessSentence`,
+  § 2)
+
+The defect sentences quote the vendored verifier, which writes them for a sliver:
+`js/recheck.js`'s `readableMessage` re-spells "61,460 ft" as miles above one mile
+and "7,605.49 mi²" at `fmtMi2`'s own precision above 100 mi². The vendored copy
+is byte-pinned and is not edited.
 
 ---
 
@@ -1269,8 +1390,19 @@ Where the plan left something open or said two things, this is the ruling.
 8. **`.recheck-line` carries `.is-defect` only for a `defect`** — a `residue`
    grade is not a warning and must not be painted as one, or eight of the ten
    reference proposals read as broken.
-9. **`css/app.css`'s kit-override count is 1** — the MapLibre attribution lift,
-   inherited verbatim from the editor. `#detail-card`'s width is this app's own
-   id and is placement, which the kit explicitly leaves to the app.
-10. **The card is `min(28rem, 42vw)`**, wider than the editor's `min(26rem, 40vw)`,
-    because a finding card is a two-column grid and 26rem collapses it.
+9. **`css/app.css`'s kit-override count is 2** — the `.ridr-toast` lift (the kit
+   floats it 1.5 rem above the viewport bottom, which on desktop is inside this
+   app's footer disclaimer) and the `prefers-reduced-motion` reset, which is
+   written on `*` and so reaches the kit's own transitions. The MapLibre
+   attribution lift that used to be the ONE override is GONE: the kit already
+   pads the bottom corners by `--sheet-h`, and doing it twice threw the
+   attribution above the sheet and behind the navbar. `#detail-card`'s width and
+   `#info-body`'s prose rhythm are this app's own ids and are placement, which
+   the kit explicitly leaves to the app.
+10. **The card is `min(28rem, 42vw)` and the finding grid is ONE COLUMN at every
+    width.** It was `repeat(auto-fit, minmax(11rem, 1fr))`, which fitted two
+    tracks into that card at 1440 and at 1024 and handed each rationale ~200 px
+    — about 32 characters a line, for the two blocks of prose the card exists to
+    let somebody read. A 65-character column that scrolls beats two 32-character
+    columns that do not; the classes, the authors and the sizes are one short
+    line each at the top of each block.

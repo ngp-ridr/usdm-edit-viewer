@@ -21,16 +21,25 @@
    camera is deliberately ephemeral — a shared link opens on the comparison, not
    on somebody's pan. See docs/contracts.md § 14.
 
-     ?load    comma-separated proposal urls (origin checked BEFORE the fetch)
-     ?demo    the bundled example set
-     ?view    published | differences        ('proposal' is the default)
-     ?pick    <shortId>                      whose classes to paint
-     ?show    <shortId>,…                    emitted only when not all
-     ?focus   <findingId>                    briefs link back through this
-     ?theme   light                          high-contrast is the DEFAULT; the
+     ?load     comma-separated proposal urls (origin checked BEFORE the fetch;
+                                             scrubbed when it loaded nothing)
+     ?demo     the bundled example set
+     ?view     published | differences       ('proposal' is the default)
+     ?pick     <shortId>                     whose classes to paint
+     ?show     <shortId>,…                   emitted only when not all
+     ?focus    <findingId>                   disc:/seam: ONLY — briefs link
+                                             back through this
+     ?proposal <shortId>                     a proposal's card
+     ?change   <patchKey>                    one change's card
+     ?theme    light                         high-contrast is the DEFAULT; the
                                              anti-flash boot reads this and
                                              nothing else
-     ?drawer  closed                         desktop only, and only when closed
+     ?drawer   closed                        desktop only, and only when closed
+
+   The three selection parameters are three because their values are three
+   different things and only `?focus=` can be resolved as a finding: emitting a
+   proposal's uuid under that name produced a link the app refused on reload,
+   with a sentence about a finding that never existed.
 
    ── ONE RECOMPUTE PASS ─────────────────────────────────────────────────────
    Everything that changes the SET of loaded proposals lands in `afterIntake()`:
@@ -91,11 +100,27 @@
    once per load rather than per interaction: every view, pick, show and
    selection below repaints and recompares nothing.
 
-   The compare loop TICKS with `setTimeout(0)` between groups so the note over
-   the map paints its progress line; without it the main thread is held for the
-   whole eight seconds and the app looks hung on the busiest thing it does. Five
-   groups is five yields, which is why the note reads "Comparing Montana, 1 of
-   5" and not nothing at all.
+   The compare loop TICKS with `setTimeout(0)` BETWEEN PAIRS, and the pair is
+   the unit because the pair is the slice: `compareProposals` is synchronous and
+   230–700 ms, so a yield per GROUP left one group of five running ten of them
+   back to back with nothing between. Measured here, Chromium headless over the
+   local server, clicking a view segment with the mouse while the sweep runs and
+   timing the trusted event's own timeStamp to the frame that follows it (three
+   clicks a boot: nine before, twelve after):
+
+   | yielding | click → next frame, mid-sweep | idle | longest long task |
+   |----------|-------------------------------|------|-------------------|
+   | per group| 118 · 149 · 806 · 164 · 749 · 287 · 202 · 274 · 875 ms (median 274) | 0–1 ms | 1,385–1,422 ms |
+   | per pair | 42 · 64 · 344 · 608 · 120 · 324 · 92 · 174 · 327 · 154 · 35 · 11 ms (median 147) | 0–1 ms | 839–933 ms |
+
+   The floor is one pair and the numbers say so: what is left is a single
+   `compareProposals` the browser has to sit through, which is why the row above
+   still carries a 608. A Worker is the next move and is not this one.
+
+   The note names THE PAIR it is comparing, not just the working area — a
+   progress line that reads "Montana, 1 of 5" for eight seconds says nothing
+   about what is moving, and the two letters in "Comparing A against C over
+   Montana" are the ones the map and the panel already use.
 
    Sections: Elements · State · Small helpers · The URL · Map · Chrome ·
    Intake · The recompute pass · Selection and focus · Briefs · About · Boot ·
@@ -132,7 +157,7 @@ import { downloadSessionBrief } from './export.js';
 /* WP-E — the engine (DOM-free; docs/contracts.md §§ 2–8). */
 import { createSession, rankFindings, resolveFindingIds } from './session.js';
 import { worstDeltaFor } from './proposal.js';
-import { compareGroup } from './compare.js';
+import { compareProposals, groupPairs } from './compare.js';
 import { findSeams } from './seams.js';
 import { createPublishedProvider } from './published.js';
 import { buildRegionBrief, buildSeamBrief, buildSessionBrief } from './brief.js';
@@ -154,6 +179,9 @@ const els = {
   drawer: $('#drawer'), drawerTab: $('#drawer-tab'), drawerScrim: $('#drawer-scrim'),
   drawerScroll: $('.ridr-drawer-scroll'),
   sessionLine: $('#session-line'),
+  /* The whole section, because the three segments are OMITTED rather than
+     disabled until something is loaded — see `paintEmptyState`. */
+  mapViewSection: $('#map-view-section'),
   viewProposal: $('#view-proposal'), viewPublished: $('#view-published'),
   viewDifferences: $('#view-differences'),
   pickRow: $('#pick-row'), pickSelect: $('#pick-select'),
@@ -179,6 +207,14 @@ const VIEWS = ['proposal', 'published', 'differences'];
 
 /** Where js/seams.js reads adjacency from. Page-relative — see CLAUDE.md. */
 const NEIGHBORS_URL = 'vendor/aoi/neighbors.json';
+
+/**
+ * What `?focus=` is allowed to carry: a FINDING id and nothing else
+ * (docs/contracts.md § 8). The two prefixes are the whole grammar, and they
+ * are tested rather than assumed because `state.selection.id` also holds
+ * proposal uuids and patch keys — which have their own parameters.
+ */
+const FINDING_ID = /^(disc|seam):[0-9a-f]+$/;
 
 const state = {
   /** The engine's Session. Built at boot; never replaced. */
@@ -253,6 +289,20 @@ let passes = 0;
 /** The parameters as they were at boot. Read once; never re-read. */
 const params = urlParams();
 
+/**
+ * The `?load=` value the address bar keeps — or null once it is known to be
+ * worthless.
+ *
+ * Held apart from `params` because it is the one boot parameter whose fate is
+ * decided AFTER the fetch: a value that loaded nothing (every url refused,
+ * unreachable, or the parameter empty) is scrubbed rather than re-emitted, so
+ * a reload does not repeat a refusal the reader has already read. A PARTIAL
+ * load keeps the whole value: the urls that worked are the session, the one
+ * that did not already said so by name, and silently shortening somebody's
+ * link would make a temporary 503 permanent.
+ */
+let loadParam = (params.get('load') ?? '').trim() || null;
+
 /* ── Small helpers ────────────────────────────────────────────────────────── */
 
 /** The polite live region. One sentence per event — never two for one thing. */
@@ -273,17 +323,44 @@ function say(message) {
  * The note over the map — boot progress, compare progress, and the intake's
  * full problem list.
  *
- * Politeness FIRST, then the text. A live region is read at the politeness it
- * carries when the mutation lands, so setting this afterwards announces a hard
- * failure at whatever politeness the previous message had.
+ * ROLE FIRST, then the text. A live region is read at the politeness it carries
+ * when the mutation lands, so setting it afterwards announces a hard failure at
+ * whatever politeness the previous message had.
+ *
+ * `role="alert"` for a failure and `role="status"` otherwise — the two ROLES,
+ * rather than `role="status"` carrying `aria-live="assertive"`. That pairing is
+ * a contradiction in the markup (status IS polite) and screen readers resolve
+ * it differently; alert is the one unambiguous way to say "this is a failure,
+ * read it now".
+ *
+ * SEVERAL SENTENCES ARE A LIST. A dropped folder can fail eight different ways,
+ * and the eight sentences were joined into one run-on paragraph — unreadable on
+ * screen and unnavigable with a screen reader. An array is the honest input; a
+ * string is split at sentence ends so a caller that still passes one gets the
+ * same list.
  */
 function note(message, { error = false } = {}) {
   if (!els.note) return;
-  if (!message) { els.note.hidden = true; els.note.textContent = ''; return; }
+  if (!message) { els.note.hidden = true; els.note.replaceChildren(); return; }
   els.note.hidden = false;
-  els.note.setAttribute('aria-live', error ? 'assertive' : 'polite');
+  els.note.setAttribute('role', error ? 'alert' : 'status');
   els.note.classList.toggle('is-error', error);
-  els.note.textContent = message;
+  const lines = noteLines(message);
+  els.note.replaceChildren(lines.length > 1
+    ? el('ul', { class: 'note-list' }, ...lines.map((s) => el('li', {}, s)))
+    : document.createTextNode(lines[0] ?? ''));
+}
+
+/**
+ * One note's sentences.
+ *
+ * Split only where a sentence actually ended — after `.`, `!` or `?` followed
+ * by whitespace. A filename carries dots ("usdm-proposal-…json.gz: not gzip")
+ * and none of them are followed by a space, so the names survive whole.
+ */
+function noteLines(message) {
+  if (Array.isArray(message)) return message.map((s) => String(s).trim()).filter(Boolean);
+  return String(message).split(/(?<=[.!?])\s+(?=\S)/).map((s) => s.trim()).filter(Boolean);
 }
 
 /** Is this a compact viewport? Matches the kit's own docking breakpoint. */
@@ -364,10 +441,22 @@ function surnameOf(proposal) {
    proposal is the default said the long way, and it would put twelve ids in the
    address bar of a session nobody has narrowed.
 
-   `?load=` and `?demo` are CARRIED THROUGH unchanged. They are how the session
-   was obtained, and dropping them would turn the address bar — which is this
-   app's only Share — into a link that opens empty. The camera is not written.
-   See the header. */
+   `?demo` and a `?load=` THAT LOADED SOMETHING are carried through: they are
+   how the session was obtained, and dropping them would turn the address bar —
+   which is this app's only Share — into a link that opens empty. A `?load=`
+   that loaded NOTHING is scrubbed instead (`loadParam`): leaving it in means
+   every reload repeats the same refusal at a reader who has already read it,
+   and an empty `?load=` names nothing at all. The camera is not written. See
+   the header.
+
+   WHAT THE SELECTION EMITS DEPENDS ON WHAT IT IS, and the three are not
+   interchangeable. `?focus=` is a FINDING id and nothing else — `disc:` or
+   `seam:`, docs/contracts.md § 8 — because that is the only kind
+   `applyUrlSelection` can resolve; emitting a proposal's uuid or a patch key
+   under that name is emitting a link the app refuses on reload, with a
+   sentence saying the finding is not in this set, about a finding that never
+   was one. A proposal goes out as `?proposal=<shortId>` and a change as
+   `?change=<patchKey>`, both honoured at boot (docs/contracts.md § 14). */
 function pushState() {
   /* A SPARSE object: `replaceUrlState` hands whatever it is given straight to
      `URLSearchParams`, which stringifies a null into the four letters "null".
@@ -375,10 +464,11 @@ function pushState() {
      `pushState` is written the same way, for the same reason. */
   const out = {};
 
-  /* How the session was obtained, carried through unchanged: the address bar
-     is this app's only Share, and dropping these would hand somebody a link
-     that opens empty. */
-  if (params.get('load')) out.load = params.get('load');
+  /* How the session was obtained, carried through: the address bar is this
+     app's only Share, and dropping these would hand somebody a link that opens
+     empty. `loadParam` is null once a `?load=` has been proved to load
+     nothing. */
+  if (loadParam) out.load = loadParam;
   if (params.has('demo')) out.demo = '';
 
   if (state.view !== 'proposal') out.view = state.view;
@@ -396,13 +486,44 @@ function pushState() {
     if (ids.length) out.show = ids.join(',');
   }
 
-  if (state.selection?.id) out.focus = state.selection.id;
+  /* ONE of the three, by what is selected — see the header above. */
+  const sel = state.selection;
+  if (sel?.id) {
+    if (FINDING_ID.test(sel.id)) out.focus = sel.id;
+    else if (sel.kind === 'change') out.change = sel.id;
+    else if (sel.kind === 'proposal') {
+      const short = proposalById(sel.id)?.shortId;
+      if (short) out.proposal = short;
+    }
+  }
 
   const theme = getTheme();
   if (theme !== 'high-contrast') out.theme = theme;
   if (drawerCtl && !drawerCtl.isOpen?.() && !isCompact()) out.drawer = 'closed';
 
   replaceUrlState(out);
+  readableSeparators();
+}
+
+/**
+ * Put the `/` and `,` back, in place.
+ *
+ * `replaceUrlState` is the kit's and hands the object to `URLSearchParams`,
+ * which percent-encodes both — so a two-file `?load=` came back as
+ * `demo%2Fa.json.gz%2Cdemo%2Fb.json.gz` and a shown subset as
+ * `a1b2c3d4%2Ce5f6a7b8`. Both are legal in a query string unencoded (RFC 3986
+ * `sub-delims` and `/`), both are what the reader typed, and this app's only
+ * Share is the address bar — a link nobody can read at a glance is a link
+ * nobody checks before sending. NOTHING IN THIS GRAMMAR CARRIES EITHER
+ * CHARACTER AS DATA: shortIds are hex, finding ids are `disc:`/`seam:` plus
+ * hex, a patch key is a uuid, and `?load=` and `?show=` are comma-separated
+ * lists that this app splits on the comma itself. `&` and `=` stay encoded,
+ * which is what keeps a url with its own query string inside `?load=` intact.
+ */
+function readableSeparators() {
+  const search = location.search;
+  if (!search || !/%2f|%2c/i.test(search)) return;
+  history.replaceState(null, '', search.replace(/%2F/gi, '/').replace(/%2C/gi, ','));
 }
 
 /* ══ Map ════════════════════════════════════════════════════════════════════ */
@@ -637,35 +758,99 @@ function paintPickControl() {
  * IT NEVER CHANGES THE ANSWER. The comparison is over everything loaded; this
  * is a way of looking at a crowded map, and a finding whose proposal is hidden
  * is dimmed in the list rather than removed from it.
+ *
+ * ── NONE IS NOT ALL, AND THE CALLER HAS TO SAY WHICH ────────────────────────
+ * An empty `shown` set means EVERY proposal (docs/contracts.md § 12), so a
+ * panel handing back the ids that are ticked could not tell "all twelve" from
+ * "none of them": unticking the last box arrived as `[]`, the app normalised
+ * it to the default, and the drawer sat with nothing ticked while the map drew
+ * everything and the live region said "Showing every loaded proposal". So the
+ * panel now says which it means — `{ ids, all }`, docs/contracts.md § 12 — and
+ * `null` is the same "all" for a caller with nothing to narrow. A BARE ARRAY
+ * keeps the old reading (empty = all) for programmatic callers, who have no
+ * checkbox to be ambiguous about.
+ *
+ * THE LAST UNTICK IS REFUSED, and that is the choice this app makes between
+ * the two the issue allowed. Hiding everything would need a THIRD state —
+ * "none" — understood by js/map.js's `setShown`, js/panels.js's `isShown`, the
+ * dimming, and `?show=`, where today there are two and exactly one spelling of
+ * the default; and what it would buy is the published week with no marks on
+ * it, which is the Published view, one control away and already announced. So
+ * the box springs back with a sentence that says where to go instead. Nothing
+ * is destroyed and nothing is silent, which is the bar a refusal has to clear.
  */
-function setShown(ids) {
+function setShown(request) {
   const all = proposals();
   const valid = new Set(all.map((p) => p.id));
-  let next = new Set([...(ids ?? [])]
+  /* Three spellings, one reading. `{ ids, all }` is the panel's; `null` is
+     "everything"; an array is the legacy one, empty meaning everything. */
+  const asked = request == null
+    ? { ids: [], all: true }
+    : Array.isArray(request)
+      ? { ids: request, all: request.length === 0 }
+      : { ids: request.ids ?? [], all: request.all === true };
+
+  let next = new Set([...asked.ids]
     .map((id) => proposalById(id)?.id)
     .filter((id) => id && valid.has(id)));
+
+  if (!asked.all && all.length && next.size === 0) {
+    /* Re-render rather than reach into the panel's markup: the rows are built
+       from `isShown(ctx, …)`, which still says what it said, so one render puts
+       every box back where the model has it. Focus is restored by id because a
+       rebuild drops it, and a keyboard reader who just pressed space would
+       otherwise be returned to the top of the document. */
+    const wasFocused = document.activeElement?.id ?? null;
+    panels?.renderProposals(all);
+    if (wasFocused) document.getElementById(wasFocused)?.focus();
+    say('At least one proposal stays shown — for the week with nothing drawn over it, ' +
+      'use the Published view.');
+    return;
+  }
+
   /* Everything, said the long way, is normalised back to the empty set — the
      one spelling of the default the map, the panels and the URL all share. */
-  if (next.size === all.length) next = new Set();
+  if (asked.all || next.size === all.length) next = new Set();
   state.shown = next;
   mapView?.setShown([...next]);
   panels?.repaintDimming?.();
   pushState();
   const n = next.size || all.length;
+  /* SINGULAR WHERE ONE IS HIDDEN. "the others’ outlines are hidden" over a set
+     of two is a sentence about a second proposal that does not exist. */
+  const hidden = all.length - n;
   live(n === all.length
     ? 'Showing every loaded proposal.'
-    : `Showing ${n} of ${all.length} proposals; the others’ outlines are hidden ` +
-      'and their findings dimmed. Nothing about the comparison changed.');
+    : `Showing ${n} of ${all.length} proposals; ` +
+      (hidden === 1
+        ? 'the other’s outline is hidden and its findings dimmed. '
+        : 'the others’ outlines are hidden and their findings dimmed. ') +
+      'Nothing about the comparison changed.');
 }
 
-/** Show or hide the empty state. It is the map's own surface, not a dialog. */
+/**
+ * Show or hide the empty state. It is the map's own surface, not a dialog.
+ *
+ * OMIT, DON'T DISABLE — the fleet's rule, honoured here at last. Briefs shipped
+ * greyed out with nothing loaded and the three view segments shipped live, with
+ * "A proposal" pressed when there was no proposal to paint: a control that
+ * cannot do anything is a control a reader has to work out the rules for, and
+ * a pressed state over an empty app is a claim that is simply untrue. Both
+ * appear on the first load and never go away again.
+ */
 function paintEmptyState() {
   const empty = (state.session?.size ?? 0) === 0;
   if (els.emptyState) els.emptyState.hidden = !empty;
-  for (const id of ['proposalSection', 'findingsSection', 'legendSection']) {
+  for (const id of ['proposalSection', 'findingsSection', 'legendSection', 'mapViewSection']) {
     if (els[id]) els[id].hidden = empty;
   }
-  if (els.btnBriefs) els.btnBriefs.disabled = state.findings.length === 0;
+  /* `hidden`, never `disabled`: there is nothing to write a brief about until a
+     comparison has found something, and there is no way to explain a grey
+     button to somebody who has not loaded a file yet. */
+  if (els.btnBriefs) {
+    els.btnBriefs.disabled = false;
+    els.btnBriefs.hidden = state.findings.length === 0;
+  }
   paintViewControls();
 }
 
@@ -735,6 +920,13 @@ async function afterIntake(report) {
     return;
   }
 
+  /* THE SESSION LINE, NOW — not in eight seconds' time. It is the first
+     sentence in the drawer and it said "Nothing is loaded" for the whole length
+     of the sweep, over a list of twelve proposals and a map painting them. What
+     is known here is the week, the count and the areas; the finding counts
+     arrive below, when they are true. */
+  panels?.renderSession({ ...summaryOf(), comparing: true });
+
   /* The map, with everything that needs no comparison. */
   mapView?.setAois(all.map((p) => p.aoi).filter(Boolean));
   mapView?.setPatches(allPatches());
@@ -754,7 +946,14 @@ async function afterIntake(report) {
   note(null);
   pushState();
 
-  live(sessionSentence());
+  /* ONE CHANNEL PER SENTENCE. `repaintFindingsList` above has just written this
+     exact sentence into `#findings-status`, which sits inside its own
+     `role="status"` — so it is already announced, and it is on screen as well.
+     A `live(sessionSentence())` here put the same words through the sr-only
+     region too: the same summary read out twice, one of the two invisible. The
+     visible one wins; the sr-only region is for the events that have no text
+     twin (a view change, a selection, a camera move, the re-check queue
+     draining). */
   /* LAST, and after every paint above: a harness waiting on this has a settled
      app, not one whose model is ahead of its drawer. */
   passes += 1;
@@ -785,13 +984,18 @@ async function paintPublished() {
 /**
  * Compare every group, then find every seam.
  *
- * TICKS BETWEEN GROUPS. `compareGroup` is synchronous and a state pair measured
- * ~0.7 s in the planning prototype; five groups would hold the main thread for
- * several seconds, and a note that cannot paint is a note nobody reads. One
- * `setTimeout(0)` per group buys the paint for the price of one task.
+ * TICKS BETWEEN PAIRS, and the pair is the unit because it is the SLICE. One
+ * pair is 230–700 ms of synchronous clipper work (js/compare.js's header);
+ * a group of five is ten of them, so yielding per GROUP left the main thread
+ * held for whole seconds at a time — measured click-to-frame 118–875 ms
+ * mid-sweep against 0 ms idle, which is a map that ignores the reader while it
+ * thinks. One `setTimeout(0)` per pair buys the paint and the queued click for
+ * the price of one task, and bounds the worst slice at one pair.
  *
- * A group that throws is reported and SKIPPED — one bad pair must not cost the
- * other four states their comparison.
+ * The pair list is `groupPairs`, js/compare.js's — the crossAoi skip rule has
+ * exactly one copy and it is not this file's. A pair that throws is reported
+ * and SKIPPED: one bad pair must not cost the other four states their
+ * comparison.
  */
 async function recompare() {
   const t0 = now();
@@ -802,20 +1006,32 @@ async function recompare() {
   for (const group of groups) {
     i += 1;
     const name = groupName(group);
-    note(`Comparing ${group.proposals?.length ?? 0} proposals over ${name} — ${i} of ${groups.length}…`);
-    live(`Comparing ${name}, ${i} of ${groups.length}.`);
-    await tick();
-    try {
-      /* `crossAoi` is the GROUP's own flag: a group of two overlapping working
-         areas must not re-compare the pairs that already have a group of their
-         own, or the same disagreement is minted twice under two ids. */
-      comparisons.push(...compareGroup(group.proposals, {
-        ground: group.ground, crossAoi: group.crossAoi === true,
-      }));
-    } catch (err) {
-      console.error('[viewer] comparison failed over', name, err);
-      note(`The comparison over ${name} failed — ${err?.message ?? 'unknown error'}. ` +
-        'The other working areas are unaffected.', { error: true });
+    /* `crossAoi` is the GROUP's own flag: a group of two overlapping working
+       areas must not re-compare the pairs that already have a group of their
+       own, or the same disagreement is minted twice under two ids. */
+    const pairs = groupPairs(group.proposals ?? [], { crossAoi: group.crossAoi === true });
+    let n = 0;
+    for (const [A, B] of pairs) {
+      n += 1;
+      /* NAMES THE PAIR, not just the group: a progress line that reads
+         "Montana, 1 of 5" for eight seconds says nothing about what is moving,
+         and these two letters are the same ones the map and the panel use. */
+      const versus = `${letterOf(A)} against ${letterOf(B)}`;
+      /* ONE CHANNEL. `#app-note` is itself a live region (`role="status"`), so
+         a `live()` beside every `note()` reads each step of the sweep TWICE —
+         nine pairs, eighteen sentences, on top of whatever the load is saying.
+         The note is the one that also shows, so the note is the one kept. */
+      note(`Comparing ${versus} over ${name} — pair ${n} of ${pairs.length}, ` +
+        `working area ${i} of ${groups.length}…`);
+      await tick();
+      try {
+        comparisons.push(compareProposals(A, B, { ground: group.ground }));
+      } catch (err) {
+        console.error('[viewer] comparison failed over', name, versus, err);
+        note(`The comparison of ${versus} over ${name} failed — ` +
+          `${err?.message ?? 'unknown error'}. The other pairs are unaffected.`,
+        { error: true });
+      }
     }
   }
 
@@ -865,9 +1081,13 @@ function groupName(group) {
  */
 function rankAllFindings(regions, seams) {
   /* § 8's collision rule runs over the WHOLE ranked list — regions and seams
-     together, in the order the panel and the briefs will use — because the
-     suffix is assigned by rank, and this is the one place that list exists.
-     `resolveFindingIds` is idempotent, so a recompute never suffixes twice. */
+     together, in the order the panel and the briefs will use — because this is
+     the one place that list exists. THE RANK IS NO LONGER AN INPUT TO AN ID: a
+     collision WIDENS BOTH SIDES to twelve hex, derived from each finding's own
+     key and nothing else (js/session.js `resolveFindingIds`; docs/contracts.md
+     § 16 decision 2 superseded the rank-assigned `-2`/`-3` suffix precisely
+     because rank is not stable across load order). It is idempotent, so a
+     recompute re-derives the same ids rather than widening a widened one. */
   return resolveFindingIds(rankFindings(regions, seams ?? []));
 }
 
@@ -1035,6 +1255,13 @@ function openSelection(sel, { fit = true } = {}) {
     select({ kind: 'proposal', id: p.id });
     if (fit) mapView?.focus(p.aoi);
     cards?.showProposal(p);
+    /* EVERY CARD ANNOUNCES. This was the one branch that did not, so opening a
+       proposal moved the camera, swapped the card and said nothing at all —
+       the whole event, for a reader who cannot see the canvas or the panel
+       that just filled. Letter, author, what is in it, where. */
+    const n = p.patches?.length ?? 0;
+    live(`Proposal ${letterOf(p)}, ${p.author?.name ?? 'an unnamed author'}, selected — ` +
+      `${n} ${n === 1 ? 'change' : 'changes'} over ${p.aoi?.name ?? 'their working area'}.`);
   }
 }
 
@@ -1199,6 +1426,18 @@ function buildAboutModal() {
       'map. A difference between two proposals is a conversation, not an error — ',
       'which is why every finding can be downloaded as a markdown brief with both ',
       'authors’ reasoning in it.'),
+
+    /* THE SAME CREDITS THE EDITOR CARRIES, in the same words: the two apps are
+       read side by side, and a fleet where one names who built it and the other
+       does not is a fleet with a hole in its provenance. Text, not a logo —
+       this app ships no Montana Climate Office mark. */
+    heading('Credits'),
+    el('p', {},
+      'Part of the Northern Great Plains Regional Incubator for Drought ',
+      'Resiliency, supported by the National Science Foundation R2I2 program. ',
+      'Built and maintained by the ',
+      el('a', { href: 'https://climate.umt.edu', rel: 'noopener' }, 'Montana Climate Office'),
+      ', University of Montana.'),
   );
 }
 
@@ -1306,6 +1545,13 @@ async function boot() {
     onToggleShown: (ids) => setShown(ids),
     onOpenProposal: (p) => openSelection({ kind: 'proposal', id: p?.id }),
     onOpenFinding: (f) => openSelection({ kind: f?.kind, id: f?.id }),
+    /* ON COMPACT THE DRAWER IS AN OVERLAY OVER THE MAP, and the card is a
+       bottom sheet UNDER it — so a finding opened from the list landed behind
+       the panel it was opened from, a scrim-dimmed sliver of the thing the
+       reader asked for. The drawer gets out of the way; `restoreFocus: false`
+       because focus belongs to the card that is opening, not back on the
+       hamburger. js/panels.js cannot know what compact is; this file can. */
+    onActivateRow: () => { if (isCompact()) drawerCtl?.close?.({ restoreFocus: false }); },
   });
   /* The card's two callbacks, for the same reason: a "Zoom" button and a
      cross-link to another finding are the same two verbs the list and the map
@@ -1346,8 +1592,16 @@ async function boot() {
      read-only map rather than no map at all. */
   if (params.has('demo')) {
     await loader.fromDemo();
-  } else if (params.get('load')) {
-    await loader.fromUrls(params.get('load').split(',').map((s) => s.trim()).filter(Boolean));
+  } else if (loadParam) {
+    const report = await loader.fromUrls(loadParam.split(',').map((s) => s.trim()).filter(Boolean));
+    /* A `?load=` THAT LOADED NOTHING IS SCRUBBED. Left in the address bar it is
+       a link whose only behaviour is to repeat its own refusal, once per
+       reload, at a reader who cannot act on it. Partial success keeps the whole
+       value — see `loadParam`. */
+    if (!report?.loaded?.length) loadParam = null;
+  } else if (params.has('load')) {
+    /* Present but empty: nothing was tried, so nothing is carried. */
+    loadParam = null;
   }
 
   applyUrlSelection();
@@ -1359,26 +1613,45 @@ async function boot() {
 }
 
 /**
- * `?pick`, `?show` and `?focus`, once there is a session for them to name.
+ * `?pick`, `?show`, `?focus`, `?proposal` and `?change`, once there is a
+ * session for them to name.
  *
- * Every value is re-validated. A shortId that names nothing is dropped in
- * silence — it is a stale link into a set that has changed — but an unknown
- * `?focus=` SAYS SO: a brief's link that quietly opens the wrong thing is worse
- * than one that admits the finding is not in this set.
+ * EVERY VALUE IS RE-VALIDATED, AND A VALUE THAT NAMES NOTHING SAYS SO. A stale
+ * `?pick=` used to be dropped in silence while the app painted proposal A
+ * instead — a shared link showing a different author's work, with nothing on
+ * screen to say a substitution had happened; `?show=` was the same failure with
+ * a wider set than the link promised. Each sentence names what the parameter
+ * was about and what is on screen instead, because "that link is stale" with no
+ * subject is a sentence nobody can act on.
+ *
+ * ONE TOAST PER TURN. The kit's `showToast` is a singleton, so three stale
+ * parameters are three clauses of ONE sentence rather than three toasts, of
+ * which a reader would see only the last.
  */
 function applyUrlSelection() {
-  if (!state.session?.size) return;
+  /* NOTHING LOADED STILL WRITES THE URL. There is no session for `?pick=` or
+     `?focus=` to name, but there may be a `?load=` that just proved itself
+     worthless, and the address bar is only ever rewritten from here — without
+     this the refused link stays up, ready to be reloaded into the same
+     refusal. A boot at defaults writes an empty query, as it always did. */
+  if (!state.session?.size) { pushState(); return; }
+  const ignored = [];
 
   const pick = params.get('pick');
   if (pick) {
     const p = proposalById(pick);
     if (p) { state.pick = p; mapView?.setPick(p); paintPickControl(); }
+    else {
+      ignored.push('That link named a proposal this set does not contain — showing ' +
+        `${letterOf(state.pick ?? proposals()[0])}.`);
+    }
   }
 
   const show = params.get('show');
   if (show) {
-    const ids = show.split(',').map((s) => s.trim()).filter(Boolean)
-      .map((s) => proposalById(s)?.id).filter(Boolean);
+    const wanted = show.split(',').map((s) => s.trim()).filter(Boolean);
+    const ids = wanted.map((s) => proposalById(s)?.id).filter(Boolean);
+    const missing = wanted.length - ids.length;
     /* Set directly rather than through `setShown`: this is the URL being
        applied, not a reader narrowing anything, and `setShown`'s sentence would
        land on top of the one the comparison just announced. A `?show=` naming
@@ -1389,14 +1662,36 @@ function applyUrlSelection() {
       panels?.renderProposals(proposals());
       panels?.repaintDimming?.();
     }
+    if (missing) {
+      ignored.push(ids.length
+        ? `That link asked to show ${missing} ${missing === 1 ? 'proposal' : 'proposals'} ` +
+          `this set does not contain — showing the ${ids.length} it does.`
+        : 'That link asked to show proposals this set does not contain — showing every one.');
+    }
   }
 
+  /* THE THREE SELECTION PARAMETERS, in the order `pushState` writes them: a
+     finding, a proposal, a change. Only one thing can be selected, so the first
+     that resolves wins and the others are not tried. */
   const focus = params.get('focus');
+  const proposalParam = params.get('proposal');
+  const changeParam = params.get('change');
   if (focus) {
     const finding = findingById(focus);
     if (finding) openSelection({ kind: finding.kind, id: finding.id });
-    else say('That link points at a finding this set does not contain.');
+    else ignored.push('That link points at a finding this set does not contain.');
+  } else if (proposalParam) {
+    const p = proposalById(proposalParam);
+    if (p) openSelection({ kind: 'proposal', id: p.id });
+    else ignored.push('That link points at a proposal this set does not contain.');
+  } else if (changeParam) {
+    const owned = patchByKey(changeParam);
+    if (owned) openSelection({ kind: 'change', id: owned.patch.key ?? changeParam });
+    else ignored.push('That link points at a change this set does not contain.');
   }
+
+  /* ONE sentence, however many parameters were stale. */
+  if (ignored.length) say(ignored.join(' '));
 
   pushState();
 }

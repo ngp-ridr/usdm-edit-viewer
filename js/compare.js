@@ -194,11 +194,28 @@ export function compareProposals(A, B, { ground = null, minAreaM2 = MIN_REGION_A
 export function compareGroup(proposals, {
   ground = null, minAreaM2 = MIN_REGION_AREA_M2, crossAoi = false,
 } = {}) {
+  return groupPairs(proposals, { crossAoi })
+    .map(([A, B]) => compareProposals(A, B, { ground, minAreaM2 }));
+}
+
+/**
+ * The pairs `compareGroup` would compare, in load order, WITHOUT comparing them.
+ *
+ * THE SKIP RULE HAS ONE COPY and this is it — `compareGroup` reads the same
+ * list. It exists because a pair costs 230–700 ms of synchronous clipper work
+ * and js/app.js has to yield to the browser BETWEEN pairs, not between groups:
+ * a group of five proposals is ten pairs and held the main thread for seconds
+ * at a time, which is a map that ignores clicks while it works. The caller
+ * walks these and calls `compareProposals` itself with a tick in between; the
+ * alternative — an async `onPair` hook in here — would make this module's one
+ * synchronous, DOM-free, Node-testable entry point a promise.
+ */
+export function groupPairs(proposals, { crossAoi = false } = {}) {
   const out = [];
   for (let i = 0; i < proposals.length; i++) {
     for (let j = i + 1; j < proposals.length; j++) {
       if (crossAoi && proposals[i].aoi.id === proposals[j].aoi.id) continue;
-      out.push(compareProposals(proposals[i], proposals[j], { ground, minAreaM2 }));
+      out.push([proposals[i], proposals[j]]);
     }
   }
   return out;

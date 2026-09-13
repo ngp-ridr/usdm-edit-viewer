@@ -551,9 +551,10 @@ export function worstDeltaFor(p, patch) {
  * lists a proposal without it.
  *
  * @returns {{grade: 'pass'|'residue'|'defect', problems: object[],
- *            residue: object[], largestKm2: number, escapedKm2: number,
- *            residueKm2: number, residueWidestM: number, ok: boolean,
- *            sentence: string, gates: object|null}}
+ *            residue: object[], completeness: string[],
+ *            completenessSentence: string, largestKm2: number,
+ *            escapedKm2: number, residueKm2: number, residueWidestM: number,
+ *            ok: boolean, sentence: string, gates: object|null}}
  */
 export function checkIntegrity(p) {
   return p.integrity;
@@ -574,6 +575,8 @@ function gradeIntegrity(pkg) {
         class: null, areaKm2: null, widthM: null, geometry: null,
       })]),
       residue: Object.freeze([]),
+      /* A re-check that threw says nothing about the paperwork either way. */
+      completeness: Object.freeze([]), completenessSentence: '',
       largestKm2: 0, escapedKm2: 0, residueKm2: 0, residueWidestM: 0,
       sentence: `Re-check: the package could not be read — ${err.message}`,
       gates: null,
@@ -589,6 +592,10 @@ function gradeIntegrity(pkg) {
     ok: r.ok,
     problems: Object.freeze(r.problems),
     residue: Object.freeze(r.residue),
+    /* The paperwork, carried alongside and NEVER folded into `grade`: a missing
+       email is not a defect in the ground (js/recheck.js's header). */
+    completeness: Object.freeze(r.completeness ?? []),
+    completenessSentence: r.completenessSentence ?? '',
     largestKm2: r.largestKm2,
     escapedKm2: r.residueKm2 + problemKm2,
     residueKm2: r.residueKm2,
