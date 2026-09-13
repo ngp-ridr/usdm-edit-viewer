@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover makes env(safe-area-inset-*) live on notched phones.
+       Without it every safe-area padding in ridr-theme.css resolves to 0. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <!-- ▸ Content-Security-Policy. A <meta> because GitHub Pages serves no custom
+       headers (frame-ancestors is absent — ignored in meta form).
+
+       STILL NO REMOTE CODE: everything third-party is vendored under
+       vendor/usdm-editor/vendor/, so script-src is our origin plus the ONE
+       inline hash below. `connect-src` is one DATA origin plus three keyless
+       basemap/DEM hosts (verify § 1 pins the set exactly):
+
+         data.sustainable-fsa.com   the USDM GeoParquet archive + its manifest
+         basemaps.cartocdn.com      the CARTO Positron style.json
+         *.basemaps.cartocdn.com    its vector tiles, sprite and glyphs
+         s3.amazonaws.com           Mapzen/AWS terrarium DEM tiles
+
+       All four send ACAO: *; none takes an API key — a serverless app has
+       nowhere to hide a secret (vendor/usdm-editor/js/basemap.js). The basemap
+       origins serve style/tile documents, never scripts: `script-src` must not
+       name them. worker-src blob: is required by MapLibre's tile workers.
+
+       `?load=` FETCHES PROPOSAL PACKAGES, and the two origins it may read from
+       are exactly `'self'` and data.sustainable-fsa.com — already in the list.
+       js/load.js refuses any other origin BEFORE the fetch, because a CSP block
+       is silent and would read as a network failure. A new origin means editing
+       this directive AND verify § 1; never one without the other.
+
+       ONE inline script is hashed here, the anti-flash theme boot. The editor
+       has two because it needs an import map for Terra Draw's bare specifier;
+       this app has no Terra Draw and no bare specifiers. Change one byte of the
+       boot — a re-indent is enough — and it is silently blocked. Regenerate
+       with `node tools/csp-hash.mjs --write`; never hand-edit the hash.
+    -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'none';
+    script-src 'self' 'sha256-Myoig5CUz64WvpnhOEejp2x1qmvEmse86FOEVyMiWUM=';
+    worker-src blob:;
+    style-src 'self';
+    font-src 'self';
+    img-src 'self' data: blob:;
+    connect-src 'self' https://data.sustainable-fsa.com https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://s3.amazonaws.com;
+    manifest-src 'self';
+    base-uri 'none';
+    form-action 'none';
+  ">
+
+  <!-- ▸ Anti-flash theme boot. INLINE and FIRST, above every stylesheet: from
+       a file it would run after first paint and reintroduce the flash.
+       Adapted from vendor/usdm-editor/vendor/style/snippets/anti-flash.html.
+
+       HIGH CONTRAST IS THE DEFAULT and `?theme=light` is the ONLY way out: the
+       boot reads the URL and nothing else — no `localStorage['ridr-theme']`
+       (a stored value would pin a browser to light forever with no control to
+       undo it) and no `prefers-contrast` (the branch it chose IS the default).
+       Byte-identical to the editor's, deliberately: the two apps are read side
+       by side and a fleet that flashes in one and not the other is a fleet.
+       See CLAUDE.md. -->
+  <script>
+  (function () {
+    var valid = ['light', 'high-contrast'];
+    var raw = new URLSearchParams(location.search).get('theme');
+    var url = raw == null ? null : raw.toLowerCase();
+    document.documentElement.dataset.theme =
+      valid.indexOf(url) > -1 ? url : 'high-contrast';
+  })();
+  </script>
+
+  <title>USDM Edit Viewer · NGP RIDR</title>
+  <meta name="description" content="View and compare proposed US Drought Monitor edits — where two proposals answer the same ground differently, and where a working-area border grew a seam.">
+  <meta name="author" content="NGP RIDR">
+  <meta name="theme-color" content="#2c5f2e">
+
+  <link rel="canonical" href="https://ngp-ridr.github.io/usdm-edit-viewer/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="NGP RIDR">
+  <meta property="og:title" content="USDM Edit Viewer · NGP RIDR">
+  <meta property="og:description" content="View and compare proposed US Drought Monitor edits — where two proposals answer the same ground differently, and where a working-area border grew a seam.">
+  <meta property="og:url" content="https://ngp-ridr.github.io/usdm-edit-viewer/">
+  <meta property="og:image" content="https://ngp-ridr.github.io/usdm-edit-viewer/brand/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="A map of the United States showing US Drought Monitor severity classes, with proposed edits outlined over them.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="USDM Edit Viewer · NGP RIDR">
+  <meta name="twitter:description" content="View and compare proposed US Drought Monitor edits — where two proposals answer the same ground differently, and where a working-area border grew a seam.">
+  <meta name="twitter:image" content="https://ngp-ridr.github.io/usdm-edit-viewer/brand/og-image.png">
+
+  <link rel="icon" href="brand/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="brand/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="brand/apple-touch-icon.png">
+  <link rel="manifest" href="brand/site.webmanifest">
+
+  <!-- No font preload: NGP RIDR ships the system stack. See
+       vendor/usdm-editor/vendor/style/theme/ridr-theme.css § 0. -->
+
+  <link rel="stylesheet" href="vendor/usdm-editor/vendor/maplibre-gl-5.18.0/maplibre-gl.css">
+  <link rel="stylesheet" href="vendor/usdm-editor/vendor/style/theme/ridr-theme.css">
+  <link rel="stylesheet" href="css/app.css">
+
+  <!-- NO IMPORT MAP. The editor needs one because terra-draw's adapter imports a
+       bare specifier; this app has no drawing surface and every specifier it
+       loads is relative. Adding one means a second CSP hash and an edit to
+       tools/csp-hash.mjs's expectations — do not add one casually. -->
+</head>
+
+<body>
+  <a class="ridr-skip-link" href="#main">Skip to map</a>
+
+  <!-- ══ Navbar ══════════════════════════════════════════════════════════════
+       Kit structure: .ridr-navbar > .logo-link + .nav-divider + .brand +
+       .nav-meta.
+
+       UTILITIES ONLY — ways into and out of the page. Every data control lives
+       in the drawer, and there is no Share button: this app writes its whole
+       state into the address bar, so the address bar IS the share.
+
+       ACCESSIBLE NAMES: no two controls on one screen may have names where one
+       contains the other, and each name must CONTAIN its own visible label
+       (WCAG 2.5.3). The drawer's controls and an open card count as on screen.
+       verify § 9f sweeps them together. -->
+  <header class="ridr-navbar">
+    <a class="logo-link" href="https://ngp-ridr.org" aria-label="NGP RIDR — home">
+      <!-- Two sibling images swapped by a pure-CSS breakpoint. Both carry alt=""
+           — decoration inside a link that already has its own accessible name.
+           Explicit width/height keeps the swap free of layout shift. -->
+      <img class="banner-img" src="brand/ngp-ridr-banner.png" alt="" width="1250" height="216">
+      <img class="badge-img" src="brand/ngp-ridr-mark.png" alt="" width="192" height="192">
+    </a>
+
+    <div class="nav-divider" aria-hidden="true"></div>
+
+    <div class="brand">
+      <h1 class="brand-title">US Drought Monitor Edit Viewer</h1>
+      <span class="brand-subtitle">Compare proposals · NGP RIDR</span>
+    </div>
+
+    <div class="nav-meta">
+      <button type="button" class="nav-btn icon-only ridr-drawer-toggle" id="btn-drawer"
+              aria-expanded="false" aria-controls="drawer" aria-label="Show controls">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="17" x2="20" y2="17"></line>
+        </svg>
+      </button>
+
+      <!-- ▸ Load. The only way a proposal gets in, besides `?load=` and the
+           demo. The input is `hidden` with its own accessible name; the button
+           in front is what a person sees and a keyboard reaches — a bare file
+           input cannot take the kit's button treatment. `multiple`, because
+           comparing is the point and one file compares with nothing. -->
+      <button type="button" class="nav-btn" id="btn-load"
+              aria-label="Load proposal files">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M12 3v12"></path><polyline points="7 10 12 15 17 10"></polyline><path d="M4 20h16"></path>
+        </svg>
+        <span class="btn-label">Load</span>
+      </button>
+      <input type="file" id="load-file-input" multiple
+             accept=".json,.gz,application/json,application/gzip"
+             aria-label="Select proposal files from this computer" hidden>
+
+      <button type="button" class="nav-btn" id="btn-demo"
+              aria-label="Demo — the twelve bundled example proposals">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M4 5h16v14H4z"></path><path d="M4 10h16"></path><path d="M10 10v9"></path>
+        </svg>
+        <span class="btn-label">Demo</span>
+      </button>
+
+      <!-- Disabled until there is something to write about. Every finding as one
+           markdown file — the thing reviewers actually talk from. -->
+      <button type="button" class="nav-btn" id="btn-briefs" disabled
+              aria-label="Briefs — download every finding as markdown">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M6 3h9l4 4v14H6z"></path><path d="M9 12h7"></path><path d="M9 16h7"></path>
+        </svg>
+        <span class="btn-label">Briefs</span>
+      </button>
+
+      <button type="button" class="nav-btn ridr-btn-info" id="btn-info" aria-label="About this tool">?</button>
+    </div>
+  </header>
+
+  <!-- ══ Main ════════════════════════════════════════════════════════════════
+       A flex ROW. The drawer is a real column that resizes the map on desktop
+       and an overlay on compact; the tab is the drawer's NEXT SIBLING, which is
+       how the theme positions it. -->
+  <main id="main" tabindex="-1">
+    <aside id="drawer" class="ridr-drawer" aria-label="Comparison controls">
+      <div class="ridr-drawer-scroll">
+
+        <!-- ▸ THE SESSION LINE. What is loaded and what was found, in one
+             sentence, at the top of everything: week, proposal count, working
+             areas, and the three finding counts. Filled by js/panels.js
+             `renderSession`. -->
+        <section class="ridr-drawer-section" id="session-section">
+          <p class="drawer-note" id="session-line">Nothing is loaded yet.</p>
+        </section>
+
+        <!-- ▸ Map view. Deliberately headerless — the segment labels say what it
+             is. No <h2> means NO `aria-labelledby` (a dangling IDREF is an
+             html-validate error and an axe violation); the group carries
+             `role="group"` with `aria-label="Map view"`, which is its name.
+
+             THREE VIEWS, and they are modes rather than layers:
+               A proposal  the picked proposal's classes inside its working
+                           area, the published week punched out around it
+               Published   the week as NDMC shipped it, nothing punched
+               Differences NDMC's class-change encoding over the findings, with
+                           the class fills hidden
+
+             `aria-pressed` is the state, on these three controls and nowhere
+             else in this app. -->
+        <section class="ridr-drawer-section" id="map-view-section">
+          <div id="map-view-controls" class="seg-btns" role="group" aria-label="Map view">
+            <button type="button" class="nav-btn seg-btn" id="view-proposal" aria-pressed="true">A proposal</button>
+            <button type="button" class="nav-btn seg-btn" id="view-published" aria-pressed="false">Published</button>
+            <button type="button" class="nav-btn seg-btn" id="view-differences" aria-pressed="false">Differences</button>
+          </div>
+          <!-- Proposal view only. Hidden as a ROW so the label never outlives
+               its select — see docs/contracts.md § 16. -->
+          <div id="pick-row" hidden>
+            <label class="drawer-label" for="pick-select">Whose classes to paint</label>
+            <select id="pick-select" disabled>
+              <option>Nothing loaded</option>
+            </select>
+          </div>
+        </section>
+
+        <!-- ▸ The proposals, grouped by working area. Each row: a checkbox whose
+             label carries the mark (dash swatch + letter) and the author, a meta
+             line, the re-check verdict, and a way to the card.
+
+             HIDING A PROPOSAL HIDES ITS OUTLINES AND DIMS ITS FINDINGS. It never
+             changes the answer: the comparison is over what was loaded, and a
+             tool whose findings depend on which checkbox is ticked is a tool
+             nobody can quote. js/panels.js `renderProposals`. -->
+        <section class="ridr-drawer-section" id="proposal-section"
+                 aria-labelledby="proposal-title" hidden>
+          <h2 class="ridr-drawer-title" id="proposal-title">Proposals</h2>
+          <div id="proposal-list"></div>
+        </section>
+
+        <!-- ▸ THE FINDINGS. This list is the map's TEXT TWIN — a screen reader
+             cannot see a WebGL canvas, so everything the map marks is also a
+             row here, in the same rank order, with the same words the card uses.
+             The count is mirrored in a role="status" sentence.
+
+             Three groups, conflicts first, because a conflict (two proposals,
+             same ground, different answers) is the thing a reconciliation
+             meeting has to resolve and a one-sided difference usually is not.
+             js/panels.js `renderFindings`. -->
+        <section class="ridr-drawer-section" id="findings-section"
+                 aria-labelledby="findings-title" hidden>
+          <h2 class="ridr-drawer-title" id="findings-title">What differs</h2>
+          <!-- The live region is the WRAPPER, not a list: role="status" on a
+               <ul> replaces its implicit list role and orphans every <li>
+               inside it (axe: listitem). -->
+          <div role="status" aria-live="polite">
+            <p class="drawer-note" id="findings-status"></p>
+          </div>
+          <details id="findings-conflicts" open>
+            <summary>Conflicts</summary>
+            <ol class="finding-group"></ol>
+          </details>
+          <details id="findings-onesided" open>
+            <summary>One-sided</summary>
+            <ol class="finding-group"></ol>
+          </details>
+          <details id="findings-seams" open>
+            <summary>Seams</summary>
+            <ol class="finding-group"></ol>
+          </details>
+        </section>
+
+        <!-- ▸ The legend, hand-built by js/panels.js from js/color.js — never
+             the kit's `ui/legend.js`, which writes inline `style` attributes
+             this page's CSP drops.
+
+             Which ramp is shown follows the view: the USDM classes under
+             A proposal and Published, NDMC's change ramp under Differences
+             (with "No change — unshaded" as a labelled hole, because the zero
+             band is real and deliberately never painted). Under all of them,
+             one row per shown proposal — dash swatch, letter, author — and the
+             mark rows for conflicts, one-sided differences and seams.
+
+             EVERY SWATCH CARRIES ITS NAME. Both ramps are CVD-hostile through
+             the middle; a bare swatch is not a reading. -->
+        <section class="ridr-drawer-section" id="legend-section"
+                 aria-labelledby="legend-title" hidden>
+          <h2 class="ridr-drawer-title" id="legend-title">Legend</h2>
+          <div id="legend-body"></div>
+          <p id="legend-key" class="ridr-legend-key"></p>
+        </section>
+
+      </div>
+    </aside>
+
+    <button type="button" class="ridr-drawer-tab" id="drawer-tab"
+            aria-expanded="true" aria-controls="drawer" aria-label="Hide controls">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+
+    <!-- Compact only, absolutely positioned INSIDE <main>: it dims the map, not
+         the navbar. -->
+    <div id="drawer-scrim" class="ridr-drawer-scrim" hidden aria-hidden="true"></div>
+
+    <div id="map-frame">
+      <div id="map" role="application"
+           aria-label="Map of US Drought Monitor severity classes with proposed edits drawn over them"></div>
+
+      <!-- Boot and error messaging. role=status so a failure is announced
+           without stealing focus. The intake's FULL problem list lands here as
+           well — a toast is one sentence and a dropped folder can fail eight
+           different ways. -->
+      <p id="app-note" role="status" hidden></p>
+
+      <!-- ▸ Nothing loaded yet. Not a modal and not a tour: the two ways in are
+           right here on the empty map, and dropping a file works anywhere over
+           the frame. -->
+      <div class="empty-state" id="empty-state">
+        <h2>Compare proposed USDM edits</h2>
+        <p>
+          Load two or more <code>usdm-edit-proposal</code> packages for the same
+          week. This tool finds the ground they answer differently and the
+          borders they disagree across. It never changes a proposal.
+        </p>
+        <div class="empty-actions">
+          <button type="button" class="nav-btn" id="empty-choose">Choose files to compare</button>
+          <button type="button" class="nav-btn" id="empty-demo">Open the example set</button>
+        </div>
+        <p class="empty-hint">Or drop files anywhere on the map.</p>
+      </div>
+
+      <!-- Raised on dragenter over `#map-frame`. -->
+      <div class="drop-hint" id="drop-hint" hidden aria-hidden="true">
+        <p>Drop proposal files to load them</p>
+      </div>
+    </div>
+
+    <!-- ══ The detail card ══════════════════════════════════════════════════
+         A proposal, a change, a conflict, a one-sided difference or a seam —
+         read WHILE looking at the ground it is about, so it docks beside the
+         map rather than covering it. `aria-modal="false"` is the truth: the map
+         stays live behind it.
+
+         `#card-title` is set per open by js/cards.js. Closing returns focus to
+         whatever opened it. -->
+    <div class="ridr-card dock-right" id="detail-card" role="dialog" aria-modal="false"
+         aria-labelledby="card-title" hidden>
+      <div class="ridr-card-head">
+        <h2 class="ridr-card-title" id="card-title">Details</h2>
+        <button type="button" class="card-close" id="card-close" aria-label="Close this panel">×</button>
+      </div>
+      <div class="ridr-card-body">
+        <div id="card-content"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="app-footer">
+    <p>
+      The US Drought Monitor is produced by the
+      <a href="https://droughtmonitor.unl.edu">National Drought Mitigation Center</a>,
+      USDA and NOAA.
+      <strong>This is not the official USDM authoring tool</strong>, and nothing
+      shown here changes the published map. Proposals are one author's reading;
+      a difference between two of them is a conversation, not an error.
+    </p>
+  </footer>
+
+  <!-- ▸ ONE dialog for "what is this" and "how do I read it". Its content is
+       `buildAboutModal` (js/app.js); its one contract is a `data-close-modal`
+       close button.
+
+       `.info-modal-box` IS THE VISIBLE PANEL — `.ridr-modal` is a transparent
+       positioning shell; omit the box and the text floats over the map with no
+       background and no scrolling. No width override: `.ridr-modal.wide` does
+       not exist in this app and must not be reintroduced. -->
+  <dialog class="ridr-modal" id="info-modal" aria-labelledby="info-modal-title">
+    <div class="info-modal-box">
+      <div class="info-modal-header">
+        <div>
+          <h2 class="info-modal-title" id="info-modal-title">About this tool</h2>
+        </div>
+        <button type="button" class="modal-close" id="info-close" data-close-modal aria-label="Close">×</button>
+      </div>
+      <div class="info-section" id="info-body" data-help-content></div>
+    </div>
+  </dialog>
+
+  <!-- No `#toast` and no `#tooltip` element: the kit's `showToast()` is a
+       SINGLETON that appends its own `.ridr-toast`, and the editor's markup for
+       both was never wired to anything. Read toasts with
+       `querySelectorAll('.ridr-toast')`. -->
+
+  <!-- ══ Scripts ═════════════════════════════════════════════════════════════
+       Classic scripts first — they install the globals the vendored modules
+       expect (`window.maplibregl`, `window.turf`, `window.topojson`), and a
+       classic script always runs before a deferred module. `topology.js`'s
+       `T()` throws a named error if turf is missing, which is the failure this
+       ordering prevents. -->
+  <script src="vendor/usdm-editor/vendor/maplibre-gl-5.18.0/maplibre-gl.js"></script>
+  <script src="vendor/usdm-editor/vendor/turf-7.4.0/turf.min.js"></script>
+  <script src="vendor/usdm-editor/vendor/topojson-client-3.1.0/topojson-client.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
