@@ -49,7 +49,8 @@ function areaKey(aoiId) {
   return slug(i < 0 ? s : s.slice(i + 1));
 }
 
-/** `'disc:1a2b3c4d'` → `'1a2b3c4d'`; a `-2` collision suffix is kept. */
+/** `'disc:1a2b3c4d'` → `'1a2b3c4d'`, and a collision-widened twelve hex is kept
+ *  whole (docs/contracts.md § 8 — the rank-assigned `-2` suffix is retired). */
 function idKey(id) {
   const s = String(id ?? '');
   const i = s.indexOf(':');

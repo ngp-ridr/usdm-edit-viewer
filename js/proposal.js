@@ -609,11 +609,23 @@ function gradeIntegrity(pkg) {
  * into a diamond.
  *
  * Not collision-proof, deliberately: a finding id travels in a URL and eight
- * hex is short enough to paste into a chat window. The session resolves the
- * collisions it can actually see, by rank (`resolveFindingIds` in
- * js/session.js).
+ * hex is short enough to paste into a chat window. Since every key names the
+ * PROPOSAL PAIR (docs/contracts.md § 8) two different findings can no longer
+ * hash equal BY CONSTRUCTION, so the only collision left is a true hash
+ * collision, and the session widens both sides of one to twelve
+ * (`resolveFindingIds` in js/session.js) exactly as it widens a `shortId`.
+ *
+ * @param {string} text
+ * @param {number} [width] 8 or 12 hex digits; 12 is a second FNV-1a over a
+ *        salted copy of the same key, so a widened id is as deterministic as a
+ *        narrow one and depends on nothing but the key.
  */
-export function hashOf(text) {
+export function hashOf(text, width = 8) {
+  const eight = fnv1a(text);
+  return width <= 8 ? eight : (eight + fnv1a(`widen|${text}`)).slice(0, width);
+}
+
+function fnv1a(text) {
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
     h ^= text.charCodeAt(i);
@@ -623,8 +635,8 @@ export function hashOf(text) {
 }
 
 /** `disc:1a2b3c4d` / `seam:1a2b3c4d` from the readable key that was hashed. */
-export function findingId(prefix, key) {
-  return `${prefix}:${hashOf(key)}`;
+export function findingId(prefix, key, width = 8) {
+  return `${prefix}:${hashOf(key, width)}`;
 }
 
 /** The four bbox numbers at a thousandth of a degree — ~100 m, far below the

@@ -105,6 +105,10 @@ const ORIGINAL_PAIRS = [
 const NEIGHBORS = existsSync(join(ROOT, 'vendor/aoi/neighbors.json'))
   ? JSON.parse(readFileSync(join(ROOT, 'vendor/aoi/neighbors.json'), 'utf8')) : null;
 
+/** The page every `?focus=` link in a brief points back at. Declared up here
+ *  because § 7 reads a seam brief's wording as well as § 8. */
+const VIEWER = 'https://ngp-ridr.github.io/usdm-edit-viewer/';
+
 console.log(`USDM Edit Viewer · the comparison engine`);
 console.log(`   fixtures: ${FIXTURES.length} packages from ${FIXTURE_DIR.replace(ROOT, '.')}`);
 
@@ -369,6 +373,36 @@ const comparisonsByPair = new Map();
   check(/^disc:[0-9a-f]{8}$/.test(sample.id), `a region id looks like ${sample.id}`);
   check(sample.key.startsWith('disc|') && sample.key.includes('state:SD'),
     `and carries its readable key: ${sample.key}`);
+  /* THE KEY NAMES THE PAIR — docs/contracts.md § 8. Without it the ground three
+     proposals answer the same way is one id for three findings. */
+  check(sample.key.includes(A.shortId) && sample.key.includes(B.shortId),
+    `and the key names BOTH proposals (${A.shortId}, ${B.shortId})`);
+  const sorted = [A.shortId, B.shortId].slice().sort().join('|');
+  check(sample.key.includes(sorted), `with the two shortIds SORTED: ${sorted}`);
+}
+{
+  /* ID STABILITY ACROSS LOAD ORDER — the property `?focus=` exists for, and the
+     one the rank-assigned `-2` suffix did not have. The same twelve files in
+     two different orders must mint the same set of ids, region and seam alike.
+     Two SESSIONS, because load order is a session-level fact: it decides which
+     proposal is A in every pair and, through `rankFindings`, what any
+     order-dependent tie-break would see. */
+  const forwards = createSession();
+  for (const f of FIXTURES) forwards.add(f.pkg, { fileName: f.name });
+  const backwards = createSession();
+  for (const f of [...FIXTURES].reverse()) backwards.add(f.pkg, { fileName: f.name });
+
+  const idsOf = (s) => resolveFindingIds(rankFindings(
+    s.groups().flatMap((g) => compareGroup(g.proposals, { ground: g.ground, crossAoi: g.crossAoi }))
+      .flatMap((c) => c.regions), []))
+    .map((f) => f.id).sort();
+  const fwd = idsOf(forwards), back = idsOf(backwards);
+  check(fwd.length === back.length && fwd.join(',') === back.join(','),
+    `all ${fwd.length} region ids survive a REVERSED load order, unchanged`);
+  check(new Set(fwd).size === fwd.length,
+    'and not one of them repeats — no suffix is needed and none is minted');
+  check(fwd.every((id) => /^disc:[0-9a-f]{8}$/.test(id)),
+    'every one is a bare eight hex: nothing widened, nothing suffixed');
 }
 
 /* ══ § 5 · the synthetic pair ══════════════════════════════════════════════ */
@@ -595,6 +629,34 @@ section(7, 'the far side, when there is no proposal for it');
   check(s2.length === SEAMS.length, 'and costs not one seam');
   check(rejecting.status().weeks.length === 0,
     'the rejection is EVICTED from the cache, so a retry is a real retry');
+
+  /* ── AND THE BRIEF SAYS SO, RATHER THAN SAYING NOTHING HAPPENED ──────────
+     A seam whose far side could not be read has nothing to report a step
+     about. "Newly stepped 0 mi · Largest step 0 classes" is not a missing
+     answer, it is the opposite answer: it reads as "we looked, and there is no
+     step". docs/contracts.md § 7. */
+  if (mn) {
+    const md = buildSeamBrief(mn, { viewerUrl: VIEWER });
+    check(/- \*\*Newly stepped\*\* not known/.test(md),
+      'an unreadable far side prints "Newly stepped not known", not "0 mi"');
+    check(/- \*\*Largest step\*\* not known/.test(md),
+      'and "Largest step not known", not "0 classes"');
+    check(/- \*\*Reciprocal\*\* (yes|no)/.test(md) && !md.includes('Both sides proposed'),
+      'the bullet is "Reciprocal", which is what the flag means');
+    check(!/\| none \| *$/m.test(md) && md.includes('not known'),
+      'and a null class in the run table reads "not known", never "none"');
+    /* THE ANALYSED LINE IS NOT THE BORDER when nobody loaded the neighbour. */
+    check(mn.sharedKm === null,
+      'the seam carries sharedKm: null — this app holds no ring for Minnesota');
+    check(md.includes('**Line analysed**') && !md.includes('**Shared boundary**'),
+      'so the brief says "Line analysed", not "Shared boundary"');
+  }
+  /* Both sides loaded: the line IS the border, and `sharedKm` says so. */
+  const sdne = SEAMS.find((s) => s.sideA.kind === 'proposal' && s.sideB.kind === 'proposal');
+  check(!!sdne && sdne.sharedKm === sdne.lengthKm,
+    'with both sides loaded the analysed line IS the shared border, and sharedKm equals it');
+  check(!!sdne && buildSeamBrief(sdne, { viewerUrl: VIEWER }).includes('**Shared boundary**'),
+    'and that brief says "Shared boundary"');
 }
 {
   /* The provider's own arithmetic, with a synthetic week rather than the
@@ -658,7 +720,6 @@ section(7, 'the far side, when there is no proposal for it');
 
 section(8, 'briefs a reviewer can argue from');
 
-const VIEWER = 'https://ngp-ridr.github.io/usdm-edit-viewer/';
 {
   const A = parsed.get('MT-06e8fb67'), B = parsed.get('MT-4ab1b4a8');
   const c = compareProposals(A, B);
@@ -706,18 +767,62 @@ const VIEWER = 'https://ngp-ridr.github.io/usdm-edit-viewer/';
     'a two-class step at a jurisdiction line gets the question it deserves');
 }
 {
+  /* EVERY FINDING'S BRIEF NAMES BOTH AUTHORS — the whole set, not a sample.
+     42 of these 188 carried a rank-assigned `-2`/`-3` id, and the comparison
+     lookup that went by that id missed: `buildRegionBrief` got A = B = null and
+     wrote "an unnamed author" seven times over. It is a property of the LIST,
+     so the list is what the check reads. */
   const comparisons = session.groups()
     .flatMap((g) => compareGroup(g.proposals, { ground: g.ground, crossAoi: g.crossAoi }));
+  const findings = resolveFindingIds(rankFindings(comparisons.flatMap((c) => c.regions), SEAMS));
+  const unnamed = [];
+  const unread = [];
+  for (const f of findings) {
+    const md = f.kind === 'seam'
+      ? buildSeamBrief(f, { viewerUrl: VIEWER })
+      /* BY THE PAIR, exactly as js/app.js's `brief()` and js/brief.js's
+         `comparisonFor` do — never by the id. */
+      : buildRegionBrief(f, comparisons.find((c) =>
+        c.pair[0] === f.proposalA && c.pair[1] === f.proposalB), { viewerUrl: VIEWER });
+    if (/an unnamed author/.test(md)) unnamed.push(f.id);
+    if (/This side could not be read/.test(md)) unread.push(f.id);
+  }
+  check(unnamed.length === 0,
+    `all ${findings.length} findings name their authors — ${unnamed.length} say ` +
+    `"an unnamed author"${unnamed.length ? ` (${unnamed.slice(0, 3).join(', ')})` : ''}`);
+  check(unread.length === 0,
+    `and not one says "This side could not be read"${unread.length ? ` (${unread.slice(0, 3).join(', ')})` : ''}`);
+
   const t0 = performance.now();
-  const md = buildSessionBrief(session, comparisons, SEAMS, { viewerUrl: VIEWER });
+  const md = buildSessionBrief(session, comparisons, SEAMS, { viewerUrl: VIEWER, findings });
   check(md.includes('## Not compared'), `the session brief says what it did NOT compare (${ms(t0)} ms)`);
   check(md.includes('## The proposals') && md.includes('## What was found'),
     'and carries the index before the briefs');
   check((md.match(/^---$/gm) ?? []).length >= comparisons.length,
     'with every individual brief under a rule');
   check(!md.includes('km²'), 'miles throughout');
-  check(md === buildSessionBrief(session, comparisons, SEAMS, { viewerUrl: VIEWER }),
+  check(md === buildSessionBrief(session, comparisons, SEAMS, { viewerUrl: VIEWER, findings }),
     'and it too is deterministic');
+
+  /* ── THE INDEX: one row per finding, ranked, each linking back ─────────── */
+  const focus = (md.match(/\?focus=/g) ?? []).length;
+  check(focus === findings.length * 2,
+    `${focus} \`?focus=\` links — one per index row and one per brief, for ` +
+    `${findings.length} findings`);
+  const ground = md.split('### Ground')[1]?.split('## Not compared')[0] ?? '';
+  const rowIds = [...ground.matchAll(/^\| \[`((?:disc|seam):[0-9a-f]+)`\]/gm)].map((m) => m[1]);
+  check(rowIds.length === findings.length,
+    `the index lists all ${rowIds.length} findings (the session has ${findings.length})`);
+  check(new Set(rowIds).size === rowIds.length,
+    'with NOT ONE id repeated — the old index listed a region once per comparison');
+  check(JSON.stringify(rowIds) === JSON.stringify(findings.map((f) => f.id)),
+    'in exactly the session\'s rank order, conflicts first');
+  /* WITHOUT `findings` the index is still unique and complete — the fallback
+     path, which is the one a caller that forgets takes. */
+  const bare = buildSessionBrief(session, comparisons, SEAMS, { viewerUrl: VIEWER });
+  const bareIds = [...bare.matchAll(/^\| \[`((?:disc|seam):[0-9a-f]+)`\]/gm)].map((m) => m[1]);
+  check(new Set(bareIds).size === bareIds.length && bareIds.length === findings.length,
+    `and the fallback index is unique and complete too (${bareIds.length} rows)`);
 }
 
 /* ══ § 9 · the gates ═══════════════════════════════════════════════════════ */
@@ -813,15 +918,34 @@ section(9, 'what the session refuses, and what it merely warns about');
   }
 }
 {
-  /* Finding ids collide rarely and must resolve deterministically — and must
-     survive being resolved twice, because js/app.js runs it on every
-     recompute. */
-  const fake = [{ id: 'disc:aaaaaaaa' }, { id: 'disc:aaaaaaaa' }, { id: 'seam:bbbbbbbb' }];
-  const once = resolveFindingIds(fake).map((f) => f.id);
-  const twice = resolveFindingIds(resolveFindingIds(fake)).map((f) => f.id);
-  check(once.join(',') === 'disc:aaaaaaaa,disc:aaaaaaaa-2,seam:bbbbbbbb',
-    `a collision resolves by rank: ${once.join(', ')}`);
-  check(once.join(',') === twice.join(','), 'and resolving twice suffixes once');
+  /* A TRUE HASH COLLISION — two unrelated keys, one hash — is the only kind
+     left now that every key names its pair, and the session resolves it by
+     WIDENING BOTH SIDES to twelve hex from their own keys. Not by rank: rank
+     has input order as its final tie-break, so a rank-assigned `-2` was not
+     stable across load order, which is the one property `?focus=` exists for.
+     It must also survive being resolved twice, because js/app.js runs it on
+     every recompute. */
+  const fake = [
+    { id: 'disc:aaaaaaaa', key: 'disc|one' },
+    { id: 'disc:aaaaaaaa', key: 'disc|two' },
+    { id: 'seam:bbbbbbbb', key: 'seam|three' },
+  ];
+  const once = resolveFindingIds(fake);
+  const twice = resolveFindingIds(resolveFindingIds(fake));
+  check(new Set(once.map((f) => f.id)).size === 3,
+    `a collision resolves to three distinct ids: ${once.map((f) => f.id).join(', ')}`);
+  check(once.filter((f) => /^disc:[0-9a-f]{12}$/.test(f.id)).length === 2,
+    'both colliding sides widen to twelve hex — not just the second');
+  check(once[2].id === 'seam:bbbbbbbb', 'and the one that did not collide is untouched');
+  check(once.map((f) => f.id).join(',') === twice.map((f) => f.id).join(','),
+    'resolving twice widens once');
+  /* ORDER-INDEPENDENT: the widened ids come from the keys, so shuffling the
+     list cannot change which id a finding gets. A `-2` by rank could. */
+  const shuffled = resolveFindingIds([fake[1], fake[0], fake[2]]);
+  check(shuffled.find((f) => f.key === 'disc|one').id === once[0].id
+     && shuffled.find((f) => f.key === 'disc|two').id === once[1].id,
+    'and the SAME finding keeps the SAME id when the list is reordered');
+
   const regions = [...comparisonsByPair.values()].flatMap((c) => c.regions);
   const findings = resolveFindingIds(rankFindings(regions, SEAMS));
   check(new Set(findings.map((f) => f.id)).size === findings.length,
@@ -829,6 +953,19 @@ section(9, 'what the session refuses, and what it merely warns about');
   const kinds = findings.map((f) => f.kind);
   check(kinds.indexOf('seam') === -1 || kinds.indexOf('seam') > kinds.lastIndexOf('one-sided'),
     'and seams come after the regions, which is the concatenation rankFindings promises');
+}
+{
+  /* SEAM IDS SURVIVE A REVERSED LOAD ORDER TOO. A seam key sorts its two AOI
+     ids and its two `shortId`s (docs/contracts.md § 8), and `<n>` is an index
+     in RANK order — so the reversal has to reach the same ranking as well as
+     the same keys. */
+  const backwards = createSession();
+  for (const f of [...FIXTURES].reverse()) backwards.add(f.pkg, { fileName: f.name });
+  const reversedSeams = await findSeams(backwards, { neighbors: NEIGHBORS });
+  const a = SEAMS.map((s) => s.id).sort().join(',');
+  const b = reversedSeams.map((s) => s.id).sort().join(',');
+  check(a === b, `all ${SEAMS.length} seam ids survive a REVERSED load order`);
+  check(new Set(SEAMS.map((s) => s.id)).size === SEAMS.length, 'and every one is distinct');
 }
 {
   const p = parsed.get('MT-4ab1b4a8');
@@ -869,7 +1006,10 @@ section(10, 'a whole twelve-proposal session, end to end');
   const findings = resolveFindingIds(rankFindings(regions, seams));
   const briefs = findings.map((f) => (f.kind === 'seam'
     ? buildSeamBrief(f, { viewerUrl: VIEWER })
-    : buildRegionBrief(f, comparisons.find((c) => c.regions.includes(f)), { viewerUrl: VIEWER })));
+    /* BY THE PAIR — the rule js/app.js's `brief()` and js/brief.js's
+       `comparisonFor` both follow (docs/contracts.md § 7). */
+    : buildRegionBrief(f, comparisons.find((c) =>
+      c.pair[0] === f.proposalA && c.pair[1] === f.proposalB), { viewerUrl: VIEWER })));
   const tBriefs = ms(t4);
 
   const total = ms(t0);

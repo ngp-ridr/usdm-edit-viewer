@@ -325,7 +325,10 @@ published labelling (186 ms) ≈ 0.7 s; five pairs ≈ 3.5 s. WP-B ticks between
 AOIs with `setTimeout(0)` so the main thread is not held for the whole sweep.
 
 `compareProposals(A, B)` and `compareProposals(B, A)` produce the same `Region`
-ids. (The key string sorts its two sides.)
+ids, and so does the same session loaded in a different order. (The key string
+sorts BOTH of its asymmetric halves — the two resulting classes, and the two
+proposal `shortId`s that § 8 puts in it. Load order is only ever which proposal
+arrives as A.)
 
 ---
 
@@ -431,6 +434,14 @@ read for: § 6 says the seam is still emitted, so its runs carry what side A
 says with `classB`, `step` and `publishedStep` all `null`. It is excluded from
 findings exactly as `pre-existing` is.
 
+**AN UNKNOWN RUN IS NEVER THE WORST RUN.** Every surface that picks one run to
+speak for a seam — the findings row, the card's two columns, the brief's
+disjuncture sentence — picks it from the runs that are not `'unknown'`, because
+a run whose far side was never read says nothing to be worst about, and its
+`null` class printed as "null" or "none" is a false statement about drought.
+When `'unknown'` is ALL there is, the longest one still fills the near column
+and the far one reads **"not known"**.
+
 `lengthKm` is the sum of its samples' equal shares of their own line string, so
 **the runs of a line add up to the line** — a flat `SEAM_SPACING_KM` per sample
 is close enough on a 680 km border and badly wrong on an edge effect's
@@ -443,6 +454,7 @@ Seam {
   kind: 'seam',
   sideA, sideB, neighbourId,
   runs: Run[], lengthKm, newStepKm, maxStep,
+  sharedKm,      // the TRUE shared border, or null — see below
   geometry,      // MultiLineString — THE LINE THE SEAM WAS ANALYSED OVER
   reciprocal,    // true when BOTH sides carry a proposal
   isNew,         // any run of kind 'new'
@@ -457,6 +469,17 @@ Seam {
 the union of the loaded side's `edgeEffects[].segments` where the neighbour is
 not — so the map draws the seam itself rather than a box around it. It is also
 exposed as `line`, which is the name js/seams.js's own functions read it under.
+
+**`lengthKm` IS THAT LINE, WHICH IS NOT ALWAYS THE BORDER, and `sharedKm` is
+the border or `null`.** Where both sides are loaded the line IS the shared
+boundary and the two numbers are equal. Where the neighbour is a jurisdiction
+nobody loaded, the line is that one author's own `edgeEffects[].segments`
+toward it — measured 72 km where the border runs 378 — and this app holds no
+ring for the far side to measure the rest against, so `sharedKm` is `null` and
+every sentence that reads it says **"N mi of M mi analysed"** rather than
+"shared" (js/panels.js `seamLines`, js/cards.js `showSeam`, js/brief.js
+`buildSeamBrief`). "68 mi of 72 mi shared" for a 378 mi border is a claim about
+the boundary made out of a measurement of something else.
 
 Rank: reciprocal-with-disagreement first → `maxStep` descending → `newStepKm`
 descending → `id`. "Reciprocal-with-disagreement" is a seam carrying a
@@ -513,8 +536,28 @@ markdown twice.
 ```js
 buildRegionBrief(region, comparison, { viewerUrl }) → string
 buildSeamBrief(seam, { viewerUrl }) → string
-buildSessionBrief(session, comparisons, seams) → string
+buildSessionBrief(session, comparisons, seams, { viewerUrl, findings }) → string
+
+rankedFindings(findings, comparisons, seams) → object[]   // one run, unique ids
+comparisonFor(region, comparisons) → Comparison|null      // BY THE PAIR
 ```
+
+**Every call takes `viewerUrl`, including the session one.** Without it not a
+single brief in a session document links back, and every brief promises it does.
+
+**`opts.findings` is the session's resolved, ranked list** (`resolveFindingIds`
+over `rankFindings`, § 5) — the same list the drawer shows. The index is built
+from it rather than from a second walk of the comparisons, which is comparison
+order (three descending runs, not one rank) and can name a region twice. The
+rank itself belongs to the engine and lives behind turf, which this module may
+not import, so it is passed in rather than recomputed. Without it the index
+falls back to the comparisons' regions, deduped by id and in kind order.
+
+**A region's comparison is found BY ITS PAIR, never by its id** — `comparisonFor`
+matches `pair` against the region's own `proposalA`/`proposalB`. An id is a hash,
+a session may widen one (§ 8), and a lookup that misses hands `buildRegionBrief`
+two nulls, which prints "an unnamed author" and "This side could not be read"
+for a finding whose card shows both authors correctly.
 
 House style is the vendored `buildEdgeBrief` (`js/geojson.js:207`): an H1 naming
 the place and the week, the disclaimer, bullet metadata, `##` per party, pin
@@ -535,12 +578,22 @@ sides citing the same evidence host / an integrity note).
 A seam brief carries the line, a run table in miles, both sides (or "no proposal
 loaded — the published week" / "could not be loaded"), the disjuncture sentence,
 and case questions — a 2-class step at a jurisdiction line "is almost never
-physical".
+physical". Its bullets are **Shared boundary** (or **Line analysed**, § 5),
+**Newly stepped**, **Largest step** and **Reciprocal** yes/no.
+
+**NOTHING IS KNOWN IS NOT ZERO.** A null class is printed **"not known"** and
+never "none" or "—": `'none'` means ground inside a working area with no drought
+on it, and `null` means a side nobody could read. A seam whose every run carries
+a null `step` — the far side unreadable — prints "not known" for **Newly
+stepped** and **Largest step** rather than "0 mi" and "0 classes", which read as
+"we looked, and there is no step". The same rule holds in the findings list and
+on the card (§ 11).
 
 A session brief is a header table of proposals and authors, an integrity table,
-the ranked index of regions and seams, a **"Not compared"** section (refused
-weeks, unloaded neighbours, unknown sides), then every individual brief under
-`---`.
+the ranked index of regions and seams — **one row per finding, each linking back
+through `?focus=`** — a **"Not compared"** section (refused weeks, unloaded
+neighbours, unknown sides), then every individual brief under `---`, in the same
+rank order the index is in.
 
 ---
 
@@ -551,32 +604,56 @@ reopen the same finding after a reload, in another browser, with the files loade
 in a different order.
 
 ```
-id      ::= 'disc:' hex8 | 'seam:' hex8
-hex8    ::= eight lowercase hex digits — FNV-1a (32-bit) over `key`
+id      ::= 'disc:' hex | 'seam:' hex
+hex     ::= eight lowercase hex digits — FNV-1a (32-bit) over `key`
+            (twelve only when two keys collide; see Collisions below)
 ```
 
 | finding | `key`, the string that is hashed |
 |---|---|
-| region | `disc\|<kind>\|<aoiId>\|<lo>\|<hi>\|<published>\|<bbox@1e-3>` |
+| region | `disc\|<kind>\|<aoiId>\|<propLo>\|<propHi>\|<lo>\|<hi>\|<published>\|<bbox@1e-3>` |
 | seam | `seam\|<aoiIdLo>\|<aoiIdHi>\|<propLo>\|<propHi>\|<n>` |
 
+- **`<propLo>`/`<propHi>` are the two sides' `shortId`s sorted** — for a seam,
+  or the literal `pub` for a published side and `unk` for an unknown one;
 - `<lo>`/`<hi>` are the pair's two resulting classes **sorted**, so argument
   order cannot change the id;
 - `<bbox@1e-3>` is the four bbox numbers rounded to 3 decimals and joined with
   `,` — a thousandth of a degree is ~100 m, far below the smallest region kept
   and far above float noise;
-- `<propLo>`/`<propHi>` are the two sides' `shortId`s sorted, or the literal
-  `pub` for a published side and `unk` for an unknown one;
 - `<n>` is the seam's index among that pair's seams, in rank order.
+
+**EVERY KEY NAMES THE PAIR, and a region's did not until 2026-09.** Three
+proposals over one working area answer a great deal of ground the same way as
+each other, so a key of `(kind, aoi, classes, published, bbox)` names one
+polygon that two or three different PAIRS each produce: measured on the demo
+set, 188 findings minted only **146 distinct ids** — 84 of them collided and 42
+took a `-2`/`-3`, one id standing for two or three findings with two or three
+different briefs behind one `?focus=` link. With the pair the same 188 mint 188.
+Sorting the two
+`shortId`s into the key makes them distinct ids and keeps both invariances —
+argument order (the key is symmetric in its pair) and load order (which is only
+ever which proposal arrives as A).
 
 Every finding also carries its `key` verbatim, so a test can assert on the
 readable string rather than the hash.
 
-**Collisions.** FNV-1a over 8 hex is not collision-proof and this app has no
-central registry. So the SESSION resolves them: when two findings hash equal,
-the second in rank order gets `-2` appended (`disc:1a2b3c4d-2`), the third `-3`.
-Deterministic because the rank is total (§ 4, § 5). The same rule gives a
-proposal's `shortId` 12 hex instead of 8 when two `pkg.id`s share their first 8.
+**Collisions.** With the pair in the key two different findings can no longer
+hash equal by construction, so the only collision left is a TRUE FNV-1a
+collision between two unrelated keys — which has never occurred on this corpus.
+The SESSION resolves one by **widening both sides to twelve hex**
+(`resolveFindingIds`, js/session.js), computed from each finding's own `key` and
+from nothing else: it therefore depends on neither rank nor load order, only on
+the SET of keys, which is the same set whatever order the files arrived in. It
+is the same rule, for the same reason, that gives a proposal's `shortId` 12 hex
+instead of 8 when two `pkg.id`s share their first 8.
+
+> The rank-assigned `-2` / `-3` suffix this replaced was deterministic only in
+> rank order, and rank had input order as its final tie-break — so the id a
+> `?focus=` link named could change with the order the files were dropped in,
+> which is the one property the id exists to have. It also mutated an id after
+> the finding was frozen, which broke every lookup that went by it (§ 7's
+> region brief found no comparison and printed "an unnamed author").
 
 `?focus=<id>` accepts the id verbatim. An id that names nothing in the session is
 not an error: the app says so once (§ 15) and opens the default view.
@@ -1166,9 +1243,13 @@ Where the plan left something open or said two things, this is the ruling.
    (`state:MT`, `aiannh:01263144-86`), so that grammar is ambiguous the moment it
    is parsed back out of `?focus=`. Hashing both kinds also keeps the URL short
    and makes the two prefixes the only thing a reader has to know.
-2. **Collisions are resolved by the session, by rank**, with a `-2` / `-3` suffix
-   (§ 8). The alternative — widening the hash — moves the problem rather than
-   removing it, and the rank is already total.
+2. ~~**Collisions are resolved by the session, by rank**, with a `-2` / `-3`
+   suffix (§ 8).~~ **SUPERSEDED 2026-09-13** — the rank's final tie-break is
+   input order, so a rank-assigned suffix was not stable across load order, and
+   the collisions it was resolving were not hash collisions at all: the region
+   key omitted the proposal pair. The key now names the pair and a true hash
+   collision widens both ids to twelve hex, which is decision 3's rule applied
+   to findings. § 8 is the record.
 3. **`shortId` is 8 hex, widened to 12 on collision within a session** — the same
    rule, applied to proposals, so `?pick=` and `?show=` cannot become ambiguous
    as a set grows.

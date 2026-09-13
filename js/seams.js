@@ -520,8 +520,16 @@ const REPORTABLE = new Set(['new', 'widened', 'narrowed']);
  * asynchronous and this function is not, so `findSeams` does that and hands
  * the resolved side in. Keeping the parameter means the signature in
  * docs/contracts.md § 5 still describes the call.
+ *
+ * @param {number|null} [opts.sharedKm]  the TRUE length of the shared border,
+ *        when it is known. Left null the seam works it out: the line handed in
+ *        IS the shared border whenever both sides carry a working area, and is
+ *        only the loaded side's edge-effect fragments when the far side is a
+ *        jurisdiction nobody loaded — see `sharedKm` on the seam below.
  */
-export function analyseSeam(sideA, sideB, line, { provider = null, index = 0 } = {}) {
+export function analyseSeam(sideA, sideB, line, {
+  provider = null, index = 0, sharedKm = null,
+} = {}) {
   void provider;
   const turf = T();
   const samples = sampleSeam(line, sideA, sideB);
@@ -544,7 +552,18 @@ export function analyseSeam(sideA, sideB, line, { provider = null, index = 0 } =
     sideA, sideB,
     neighbourId: sideB.aoi?.id ?? null,
     runs: Object.freeze(runs),
+    /* THE ANALYSED LENGTH — the line this seam was actually walked over. */
     lengthKm,
+    /* THE BORDER, which is not always the same thing and must never be
+       reported as if it were. Where both sides are loaded the line IS
+       `sharedLine(aoiA, aoiB)` and the two are one number. Where the
+       neighbour is a jurisdiction nobody loaded, the line is that author's
+       own `edgeEffects[].segments` toward it — fragments, measured at 72 km
+       where the shared border runs 378 — and this app has no ring for the far
+       side to measure the rest against. `null` says so, and every sentence
+       that reads it says "analysed" rather than "shared" (js/panels.js
+       `seamLines`, js/cards.js `showSeam`, js/brief.js `buildSeamBrief`). */
+    sharedKm: sharedKm ?? (sideA.aoi?.geometry && sideB.aoi?.geometry ? lengthKm : null),
     newStepKm,
     maxStep,
     /* RECIPROCAL means both sides carry a PROPOSAL (docs/contracts.md § 5) —

@@ -21,7 +21,7 @@ import {
   T, asMulti, asFeature, indexParts, envelopeOf, bboxOverlaps, clipToExtent,
   areaKm2,
 } from '../vendor/usdm-editor/js/topology.js';
-import { parseProposal, withShortId } from './proposal.js';
+import { parseProposal, withShortId, findingId } from './proposal.js';
 import { rankRegions } from './compare.js';
 import { rankSeams } from './seams.js';
 
@@ -247,38 +247,53 @@ export function rankFindings(regions, seams) {
 
 /* ── finding ids ──────────────────────────────────────────────────────────── */
 
+/** A widened finding id, in hex digits — docs/contracts.md § 8, and the same
+ *  number a colliding `shortId` widens to, for the same reason. */
+const WIDE_ID_HEX = 12;
+
 /**
  * Resolve id collisions across a whole session's findings — docs/contracts.md
  * § 8.
  *
- * FNV-1a over eight hex is not collision-proof and this app has no central
- * registry, so the session is the only place that can see two findings hash
- * equal. The second in RANK ORDER gets `-2`, the third `-3`. Deterministic
- * because the rank is total (js/compare.js `rankRegions`, js/seams.js
- * `rankSeams`), which is the property that lets a `?focus=` link in a brief
- * reopen the same finding after a reload, in another browser, with the files
- * loaded in a different order.
+ * THE SUFFIX THIS REPLACED WAS ASSIGNED BY RANK, and that was the bug. Every
+ * key now names the proposal pair that produced the finding (js/compare.js
+ * `makeRegion`, js/seams.js `stampSeam`), so two different findings can no
+ * longer hash equal by construction — the ground three proposals answer the
+ * same way is three findings with three keys — and the only collision left is
+ * a TRUE hash collision between two unrelated keys, which has never occurred
+ * on this corpus. A `-2` for that case was deterministic only in rank order,
+ * which is not stable across load order: the one property `?focus=` exists
+ * for.
  *
- * Widening the hash instead would move the problem rather than remove it, and
- * would lengthen every id in every brief to pay for a case that has never
- * occurred on this corpus.
+ * So a collision WIDENS BOTH SIDES to twelve hex, which is exactly the rule
+ * this file already applies to a colliding `shortId` (`settleShortIds`) and
+ * for the same reason: a session where one id is 8 and its twin is 12 is a
+ * session where the 8 is ambiguous. A widened id is computed from the
+ * finding's own `key` and from nothing else, so it depends on neither rank nor
+ * load order — only on the SET of keys, which is the same set whatever order
+ * the files arrived in.
  *
- * **IDEMPOTENT**: applying it twice never suffixes twice. A suffixed id is a
- * different string from the one it was derived from, so on the second pass
- * every id in the list is unique and every finding comes back untouched —
- * which is what lets js/app.js run it over the whole findings list on every
- * recompute without tracking whether it already has.
+ * **IDEMPOTENT**: a second pass sees a list whose ids are already distinct and
+ * hands every finding back untouched, which is what lets js/app.js run it over
+ * the whole findings list on every recompute without tracking whether it
+ * already has.
  *
  * @param {object[]} findings  ranked, regions before seams (`rankFindings`)
  * @returns {object[]} the same objects, with colliding ones replaced by frozen
- *          copies carrying the suffixed id
+ *          copies carrying the widened id
  */
 export function resolveFindingIds(findings) {
-  const seen = new Map();
+  const counts = new Map();
+  for (const f of findings) counts.set(f?.id, (counts.get(f?.id) ?? 0) + 1);
+  let clashes = 0;
+  for (const n of counts.values()) if (n > 1) clashes++;
+  if (!clashes) return findings;
   return findings.map((f) => {
-    const n = (seen.get(f.id) ?? 0) + 1;
-    seen.set(f.id, n);
-    if (n === 1) return f;
-    return Object.freeze({ ...f, id: `${f.id}-${n}` });
+    /* A finding with no readable key cannot be widened from one; it is left as
+       it stands rather than given a rank-dependent name. Every finding this
+       app builds carries its key verbatim (docs/contracts.md § 8). */
+    if (counts.get(f?.id) === 1 || !f?.key || !f?.id) return f;
+    const prefix = String(f.id).split(':')[0];
+    return Object.freeze({ ...f, id: findingId(prefix, f.key, WIDE_ID_HEX) });
   });
 }

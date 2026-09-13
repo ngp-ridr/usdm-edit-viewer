@@ -81,6 +81,20 @@ export function classPhrase(level) {
   return `${level} · ${USDM_LABELS[level] ?? level}`;
 }
 
+/**
+ * A class in a list row, where `null` and `'none'` are DIFFERENT ANSWERS.
+ *
+ * `'none'` is ground inside a working area that carries no drought. `null` is a
+ * side nobody could read — the published far side of a seam, with the archive
+ * unreachable — and calling that "no drought" states the opposite of what is
+ * known. `classPhrase` folds the two together deliberately, because everywhere
+ * it is used a class is always present; this is for the one place that is not.
+ */
+export function classWord(level) {
+  if (level == null) return 'not known';
+  return level === 'none' ? 'no drought' : String(level);
+}
+
 /** A swatch for one USDM class, coloured through the CSSOM. */
 export function classSwatch(level) {
   const sw = el('span', { class: 'legend-swatch' });
@@ -478,21 +492,42 @@ export function createPanels(els, ctx, handlers = {}) {
     const a = f?.sideA?.aoi?.name ?? f?.aoiIds?.[0] ?? 'one side';
     const b = f?.sideB?.aoi?.name ?? f?.aoiIds?.[1] ?? 'the other side';
     const runs = (f?.runs ?? []).filter((r) => r?.kind && r.kind !== 'agree' && r.kind !== 'pre-existing');
-    const worst = runs.reduce((w, r) =>
-      (Math.abs(r?.step ?? 0) > Math.abs(w?.step ?? 0) ? r : w), runs[0] ?? null);
+    /* AN UNKNOWN RUN IS NOT A STEP — its far side is the published week this
+       app could not read, so its `classB` is null and its `step` is null.
+       Leaving it in the worst-run pick let a seam with a real step lose to one
+       that says nothing, and printed the null as "null". */
+    const stepped = runs.filter((r) => r.kind !== 'unknown');
+    const worst = stepped.reduce((w, r) =>
+      (Math.abs(r?.step ?? 0) > Math.abs(w?.step ?? 0) ? r : w), stepped[0] ?? null)
+      /* Nothing but unknown runs: the row still says what THIS side proposes
+         at the line, against a far side it names as unread. */
+      ?? [...runs].sort((x, y) => (y?.lengthKm ?? 0) - (x?.lengthKm ?? 0))[0] ?? null;
     const stepKm = runs.reduce((s, r) => s + (r?.lengthKm ?? 0), 0);
     const what = [
-      worst
-        ? `${worst.classA === 'none' ? 'no drought' : worst.classA} → ` +
-          `${worst.classB === 'none' ? 'no drought' : worst.classB}`
-        : 'no step',
+      worst ? `${classWord(worst.classA)} → ${classWord(worst.classB)}` : 'no step',
       ` · ${f?.reciprocal ? 'reciprocal' : 'one-sided'}`,
       f?.isNew ? ' · new' : '',
     ];
+    /* "OF N MI SHARED" IS A CLAIM ABOUT THE BORDER, and the border is only
+       known when both sides are loaded (js/seams.js `sharedKm`). Facing a
+       neighbour nobody loaded, the line is that author's own edge effects —
+       68 of "72 mi shared" where the border runs 378 — so the word becomes
+       "analysed", which is what the number actually measures. */
+    const whole = f?.sharedKm ?? f?.lengthKm ?? stepKm ?? 0;
+    const word = f?.sharedKm != null ? 'shared' : 'analysed';
     const size = stepKm
-      ? `${fmtMi(stepKm)} mi of ${fmtMi(f?.lengthKm ?? stepKm)} mi shared`
-      : `${fmtMi(f?.lengthKm ?? 0)} mi shared`;
-    return { where: `${a} / ${b}`, what, size };
+      ? `${fmtMi(stepKm)} mi of ${fmtMi(whole)} mi ${word}`
+      : `${fmtMi(whole)} mi ${word}`;
+    /* AUTHOR-QUALIFIED, as `regionLines` is: three Montana proposals against
+       one North Dakota one are three seams over one border, and without the
+       surnames the three rows are byte-identical. */
+    return { where: `${a} (${sideWho(f?.sideA)}) / ${b} (${sideWho(f?.sideB)})`, what, size };
+  }
+
+  /** Who a seam's side is, in one word: an author, or what stands in for one. */
+  function sideWho(side) {
+    if (side?.kind === 'proposal') return surnameOf(side.proposal?.author);
+    return side?.kind === 'published' ? 'published' : 'not read';
   }
 
   /** The patch NAMES a region attributes to one side. */

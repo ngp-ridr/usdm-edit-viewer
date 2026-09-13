@@ -218,12 +218,24 @@ function crossAoiId(A, B) {
 /* ── one region ───────────────────────────────────────────────────────────── */
 
 function makeRegion({ A, B, a, b, p, kind, changedBy, geometry, bbox, km2, aoiId }) {
-  /* THE KEY SORTS ITS TWO SIDES, which is what makes `compareProposals(A, B)`
-     and `compareProposals(B, A)` mint the same id: everything else in the
-     string is symmetric already (the kind, the ground, the published level),
-     and the two resulting classes are the one asymmetric pair. */
+  /* THE KEY NAMES THE PAIR, and it SORTS both of its asymmetric halves.
+     Sorting is what makes `compareProposals(A, B)` and `compareProposals(B, A)`
+     mint the same id — everything else in the string is symmetric already (the
+     kind, the ground, the published level) — and it is the same property that
+     makes the id survive a different LOAD ORDER, since load order is only ever
+     which proposal arrives as A.
+
+     THE PAIR IS IN THE KEY BECAUSE WITHOUT IT AN ID IS NOT AN IDENTITY. Three
+     proposals over one working area answer a great deal of ground the same way
+     as each other, so `(kind, aoi, classes, published, bbox)` names a polygon
+     that two or three different PAIRS each produce: one id for three findings,
+     three briefs behind one `?focus=` link, and a session left to break the tie
+     by rank — which is not stable across load order, the one property `?focus=`
+     exists for. With the two `shortId`s in the string the three are three ids
+     and nothing downstream has to suffix anything (docs/contracts.md § 8). */
   const [lo, hi] = [a, b].slice().sort();
-  const key = `disc|${kind}|${aoiId}|${lo}|${hi}|${p}|${bboxKey(bbox)}`;
+  const [propLo, propHi] = [A.shortId, B.shortId].slice().sort();
+  const key = `disc|${kind}|${aoiId}|${propLo}|${propHi}|${lo}|${hi}|${p}|${bboxKey(bbox)}`;
   return Object.freeze({
     id: findingId('disc', key),
     key,

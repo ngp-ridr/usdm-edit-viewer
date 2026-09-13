@@ -41,9 +41,14 @@ const ord = (level) => LEVELS.indexOf(level) - 1;
 
 /** How a class is named in a sentence: the code AND its name, always. Both USDM
  *  ramps are CVD-hostile in the middle, so nothing in this app ever says a
- *  class without saying what it is called (CLAUDE.md). */
+ *  class without saying what it is called (CLAUDE.md).
+ *
+ *  `null` IS NOT `'none'`. A side the published week could not be read for has
+ *  no class at all, and "no drought" about it is a false statement about
+ *  drought rather than a missing one. */
 function className(level) {
-  if (level === 'none' || level == null) return 'no drought';
+  if (level == null) return 'not known';
+  if (level === 'none') return 'no drought';
   return `**${level} · ${USDM_LABELS[level] ?? 'unnamed class'}**`;
 }
 
@@ -330,11 +335,27 @@ export function buildSeamBrief(seam, { viewerUrl = '' } = {}) {
     `**${week}**. Drought does not stop at a jurisdiction, so a step that appears at one ` +
     `is a step two people drew from two sides. Nothing here has been published.`);
   L.push('');
+  /* NOTHING IS KNOWN ABOUT A STEP WHOSE FAR SIDE COULD NOT BE READ, and a
+     brief that prints "0 mi · 0 classes" for one has stated the opposite: it
+     reads as "we looked and there is no step". A run carries a null `step`
+     exactly when its far side is unknown, so every run being null IS the
+     unreadable seam, and the two bullets say so in words. */
+  const nothingKnown = seam.runs.length > 0 && seam.runs.every((r) => r.step == null);
   L.push(`- **Finding** \`${seam.id}\` (seam)`);
-  L.push(`- **Shared boundary** ${fmtMi(seam.lengthKm)} mi`);
-  L.push(`- **Newly stepped** ${fmtMi(seam.newStepKm)} mi`);
-  L.push(`- **Largest step** ${seam.maxStep} class${seam.maxStep === 1 ? '' : 'es'}`);
-  L.push(`- **Both sides proposed** ${seam.reciprocal ? 'yes' : 'no'}`);
+  /* THE ANALYSED LINE IS NOT THE BORDER when the neighbour is a jurisdiction
+     nobody loaded: it is the loaded author's own edge effects toward it, and
+     this app has no ring for the far side to measure the rest against
+     (js/seams.js `sharedKm`). */
+  if (seam.sharedKm != null) L.push(`- **Shared boundary** ${fmtMi(seam.sharedKm)} mi`);
+  else {
+    L.push(`- **Line analysed** ${fmtMi(seam.lengthKm)} mi — the loaded side's own edge ` +
+      `effects toward this neighbour, not the whole shared border, which is not known ` +
+      `here because no proposal is loaded for the far side`);
+  }
+  L.push(`- **Newly stepped** ${nothingKnown ? 'not known' : `${fmtMi(seam.newStepKm)} mi`}`);
+  L.push(`- **Largest step** ${nothingKnown ? 'not known'
+    : `${seam.maxStep} class${seam.maxStep === 1 ? '' : 'es'}`}`);
+  L.push(`- **Reciprocal** ${seam.reciprocal ? 'yes' : 'no'}`);
   if (seam.anchor) L.push(`- **Around** ${coord(seam.anchor)}`);
   if (viewerUrl) L.push(`- **Open in the viewer** [${seam.id}](${focusLink(viewerUrl, seam.id)})`);
   L.push('');
@@ -348,7 +369,7 @@ export function buildSeamBrief(seam, { viewerUrl = '' } = {}) {
     for (const r of shown) {
       L.push(`| ${r.kind} | ${plain(r.classA)} | ${plain(r.classB)} | ` +
         `${plain(r.publishedA)} / ${plain(r.publishedB)} | ` +
-        `${r.step == null ? '—' : signed(r.step)} | ${fmtMi(r.lengthKm)} mi |`);
+        `${r.step == null ? 'not known' : signed(r.step)} | ${fmtMi(r.lengthKm)} mi |`);
     }
   } else {
     L.push('_Nothing along this line changed._');
@@ -481,8 +502,31 @@ function seamQuestions(seam, nameA, nameB, A, B) {
  * over the proposals that loaded, the neighbours that loaded and the sides
  * that could be read, and saying so is the difference between a report and a
  * claim.
+ *
+ * ── THE INDEX IS THE SESSION'S OWN RANKED LIST ────────────────────────────
+ * `opts.findings` is the list js/app.js already holds — `resolveFindingIds`
+ * over `rankFindings` — and it is passed in rather than rebuilt here for two
+ * reasons. It is the ONE list: an index built by walking the comparisons is a
+ * second traversal in comparison order, which is three descending runs rather
+ * than one rank, and it repeats a region that more than one comparison can
+ * reach. And the rank itself belongs to the engine (`rankRegions`,
+ * `rankSeams`), which lives behind turf — this module may not import it, and a
+ * comparator copied in here is a copy that drifts.
+ *
+ * Without it the index falls back to the comparisons' own regions, DEDUPED BY
+ * ID and in kind order: unique and complete, but only as ranked as the caller
+ * left them.
+ *
+ * @param {object} session
+ * @param {object[]} comparisons
+ * @param {object[]} seams
+ * @param {object} [opts]
+ * @param {string} [opts.viewerUrl]  every index row links back through it
+ * @param {object[]} [opts.findings] the session's resolved, ranked findings
  */
-export function buildSessionBrief(session, comparisons = [], seams = [], { viewerUrl = '' } = {}) {
+export function buildSessionBrief(session, comparisons = [], seams = [], {
+  viewerUrl = '', findings = null,
+} = {}) {
   const proposals = session.list();
   const week = session.week() ?? 'an unrecorded week';
   const L = [];
@@ -504,16 +548,20 @@ export function buildSessionBrief(session, comparisons = [], seams = [], { viewe
   }
   L.push('');
 
-  const regions = comparisons.flatMap((c) => c.regions);
-  const conflicts = regions.filter((r) => r.kind === 'conflict');
-  const oneSided = regions.filter((r) => r.kind === 'one-sided');
+  /* ONE LIST, ONE RUN, ONE ROW PER FINDING — the index below and the briefs
+     under the rules are the same list read twice, so a `?focus=` link in the
+     index and the brief it names cannot disagree. */
+  const ranked = rankedFindings(findings, comparisons, seams);
+  const conflicts = ranked.filter((f) => f.kind === 'conflict');
+  const oneSided = ranked.filter((f) => f.kind === 'one-sided');
+  const lines = ranked.filter((f) => f.kind === 'seam');
   L.push('## What was found');
   L.push('');
   L.push(`- **${conflicts.length} conflict${conflicts.length === 1 ? '' : 's'}** — two ` +
     `proposals changing the same ground to different classes`);
   L.push(`- **${oneSided.length} one-sided difference${oneSided.length === 1 ? '' : 's'}** — ` +
     `one changed it, the other left it as published`);
-  L.push(`- **${seams.length} seam${seams.length === 1 ? '' : 's'}** — a step along a shared ` +
+  L.push(`- **${lines.length} seam${lines.length === 1 ? '' : 's'}** — a step along a shared ` +
     `working-area border`);
   L.push('');
 
@@ -523,18 +571,21 @@ export function buildSessionBrief(session, comparisons = [], seams = [], { viewe
     L.push('| Finding | Where | Disagreement | Ground |');
     L.push('|---|---|---|---|');
     for (const r of [...conflicts, ...oneSided]) {
-      L.push(`| \`${r.id}\` | ${r.aoiId} | ${plain(r.classA)} vs ${plain(r.classB)} ` +
+      L.push(`| ${idCell(r.id, viewerUrl)} | ${r.aoiId} | ${plain(r.classA)} vs ${plain(r.classB)} ` +
         `(published ${plain(r.published)}) | ${fmtMi2(r.areaKm2)} ${MI2} |`);
     }
     L.push('');
   }
-  if (seams.length) {
+  if (lines.length) {
     L.push('### Borders');
     L.push('');
     L.push('| Finding | Line | Largest step | Newly stepped |');
     L.push('|---|---|---|---|');
-    for (const s of seams) {
-      L.push(`| \`${s.id}\` | ${s.aoiIds.join(' / ')} | ${s.maxStep} | ${fmtMi(s.newStepKm)} mi |`);
+    for (const s of lines) {
+      const known = !(s.runs ?? []).length || !s.runs.every((r) => r.step == null);
+      L.push(`| ${idCell(s.id, viewerUrl)} | ${s.aoiIds.join(' / ')} | ` +
+        `${known ? s.maxStep : 'not known'} | ` +
+        `${known ? `${fmtMi(s.newStepKm)} mi` : 'not known'} |`);
     }
     L.push('');
   }
@@ -554,7 +605,7 @@ export function buildSessionBrief(session, comparisons = [], seams = [], { viewe
       `of any seam toward ${unloaded.size === 1 ? 'it' : 'them'} is the published week ` +
       `rather than somebody's reading of it.`);
   }
-  const unknownSides = seams.filter((s) => s.sideA?.kind === 'unknown' || s.sideB?.kind === 'unknown');
+  const unknownSides = lines.filter((s) => s.sideA?.kind === 'unknown' || s.sideB?.kind === 'unknown');
   if (unknownSides.length) {
     gaps.push(`${unknownSides.length} seam${unknownSides.length === 1 ? ' has' : 's have'} a ` +
       `side the published week could not be read for; those are reported with one side only.`);
@@ -570,21 +621,73 @@ export function buildSessionBrief(session, comparisons = [], seams = [], { viewe
   for (const g of gaps) L.push(`- ${g}`);
   L.push('');
 
-  const byId = new Map();
-  for (const c of comparisons) for (const r of c.regions) byId.set(r.id, [r, c]);
-  for (const [, [r, c]] of byId) {
+  /* THE SAME RANKED LIST AGAIN, so the document reads in the order its own
+     index does. A region's comparison is found BY ITS PAIR and never by its
+     id: the id is a hash of a key, and looking a finding up by the thing it
+     hashes to is how both sides of a brief went missing (the pair is what
+     `buildRegionBrief` needs, and a finding carries it). */
+  for (const f of ranked) {
     L.push('---');
     L.push('');
-    L.push(buildRegionBrief(r, c, { viewerUrl }));
-    L.push('');
-  }
-  for (const s of seams) {
-    L.push('---');
-    L.push('');
-    L.push(buildSeamBrief(s, { viewerUrl }));
+    L.push(f.kind === 'seam'
+      ? buildSeamBrief(f, { viewerUrl })
+      : buildRegionBrief(f, comparisonFor(f, comparisons), { viewerUrl }));
     L.push('');
   }
   return L.join('\n');
+}
+
+/* ── the session's one list ───────────────────────────────────────────────── */
+
+/**
+ * The findings a session brief indexes and then prints — one row each, in the
+ * caller's rank order.
+ *
+ * The caller (js/app.js `sessionBrief`, tools/compare.test.mjs) passes the
+ * session's resolved, ranked list, which is the whole point: it is the list the
+ * drawer shows and the list every `?focus=` link in this document names. The
+ * fallback walks the comparisons instead, which is unique and complete but
+ * only as ordered as they were.
+ *
+ * Either way it DEDUPES BY ID. Two runs of the same region through one document
+ * is how the index came to list one id twice with two different areas.
+ */
+export function rankedFindings(findings, comparisons = [], seams = []) {
+  const list = Array.isArray(findings) && findings.length
+    ? findings
+    : [...comparisons.flatMap((c) => c.regions ?? []).filter((r) => r.kind === 'conflict'),
+      ...comparisons.flatMap((c) => c.regions ?? []).filter((r) => r.kind === 'one-sided'),
+      ...seams];
+  const seen = new Set();
+  const out = [];
+  for (const f of list) {
+    if (!f?.id || seen.has(f.id)) continue;
+    seen.add(f.id);
+    out.push(f);
+  }
+  return out;
+}
+
+/**
+ * The comparison a region came out of, BY THE PAIR IT NAMES.
+ *
+ * Never by the region's id: an id is a hash, a session may widen one, and a
+ * lookup that misses hands `buildRegionBrief` two nulls, which prints "an
+ * unnamed author" twice and "This side could not be read" — a brief with the
+ * argument taken out of it. The pair is two proposal ids the region carries
+ * verbatim and every comparison states in `pair`, and each pair is compared
+ * exactly once (js/compare.js `compareGroup`).
+ */
+export function comparisonFor(region, comparisons = []) {
+  return comparisons.find((c) =>
+    c?.pair?.[0] === region?.proposalA && c?.pair?.[1] === region?.proposalB)
+    ?? comparisons.find((c) => (c?.regions ?? []).includes(region))
+    ?? null;
+}
+
+/** A finding id in a table cell, linked back to the viewer when there is one. */
+function idCell(id, viewerUrl) {
+  return viewerUrl ? `[\`${id}\`](${focusLink(viewerUrl, id)})` : `\`${id}\``;
 }
 
 /* ── shared bits ──────────────────────────────────────────────────────────── */
@@ -648,9 +751,11 @@ function gradeWord(p) {
   return 'not re-checked';
 }
 
-/** A class code with no markup, for a table cell. */
+/** A class code with no markup, for a table cell. `null` is a side that was
+ *  never read and says so; `'none'` is ground inside a working area with no
+ *  drought on it. A dash used to stand for both. */
 function plain(level) {
-  return level == null ? '—' : level === 'none' ? 'none' : level;
+  return level == null ? 'not known' : level === 'none' ? 'none' : level;
 }
 
 function signed(n) {

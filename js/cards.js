@@ -499,8 +499,13 @@ export function createCards(els, ctx, handlers = {}) {
     const b = s.sideB?.aoi?.name ?? s.aoiIds?.[1] ?? 'the other area';
     const runs = (s.runs ?? []).filter((r) => r.kind !== 'agree' && r.kind !== 'pre-existing');
 
+    /* "SHARED BORDER" ONLY WHEN THE BORDER IS KNOWN. Facing a jurisdiction
+       nobody loaded, the line is the loaded author's own edge effects toward
+       it and not the whole boundary (js/seams.js `sharedKm`). */
     const lede = [
-      `${fmtMi(s.lengthKm ?? 0)} mi of shared border`,
+      s.sharedKm != null
+        ? `${fmtMi(s.sharedKm)} mi of shared border`
+        : `${fmtMi(s.lengthKm ?? 0)} mi of border analysed — no proposal is loaded for the far side`,
       s.reciprocal ? 'both sides proposed a change' : 'one side proposed a change',
       s.isNew ? 'this step is new — the published map did not have it' : null,
       s.maxStep ? `the largest step is ${Math.abs(s.maxStep)} class${Math.abs(s.maxStep) === 1 ? '' : 'es'}` : null,
@@ -508,9 +513,16 @@ export function createCards(els, ctx, handlers = {}) {
 
     /* The worst run is what the two sides are being read as proposing AT THE
        LINE — the run table below has every run, but the columns need the one
-       number the disagreement is about. */
-    const worst = runs.reduce((w, r) =>
-      (Math.abs(r?.step ?? 0) > Math.abs(w?.step ?? 0) ? r : w), runs[0] ?? null);
+       number the disagreement is about.
+
+       AN UNKNOWN RUN IS NOT A STEP: its far side is the published week this app
+       could not read, so its `classB` is null and it must never win the pick
+       over a run that says something. When unknown is ALL there is, the longest
+       one still fills the near column, and the far one reads "not known". */
+    const stepped = runs.filter((r) => r.kind !== 'unknown');
+    const worst = stepped.reduce((w, r) =>
+      (Math.abs(r?.step ?? 0) > Math.abs(w?.step ?? 0) ? r : w), stepped[0] ?? null)
+      ?? [...runs].sort((x, y) => (y?.lengthKm ?? 0) - (x?.lengthKm ?? 0))[0] ?? null;
 
     open(`Seam · ${a} / ${b}`, [
       el('p', { class: 'card-lede' }, lede),
@@ -569,8 +581,12 @@ export function createCards(els, ctx, handlers = {}) {
       el('table', { class: 'data-table' }, el('thead', {}, head), body));
   }
 
+  /* `null` and `'none'` are DIFFERENT ANSWERS in a run table. `'none'` means
+     "inside that working area, no drought"; `null` means the far side was never
+     read. Printing "none" for both told a reader there was no drought across a
+     line this app could not see. */
   function shortLevel(level) {
-    return !level || level === 'none' ? 'none' : level;
+    return level == null ? 'not known' : level === 'none' ? 'none' : level;
   }
 
   function seamNotesBlock(s) {

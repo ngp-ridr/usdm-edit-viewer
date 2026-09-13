@@ -617,9 +617,16 @@ function paintPickControl() {
     p.shortId,
     `${markFor(p.id)?.letter ?? '?'} · ${p.author?.name ?? 'Unnamed author'} — ${p.aoi?.name ?? 'an unnamed area'}`,
   ]);
-  const current = [...sel.options].map((o) => `${o.value} ${o.textContent}`);
+  /* A PRINTABLE SEPARATOR. This comparison only has to tell two rendered
+     option lists apart, and it used to join value to text with a NUL — which
+     made the whole module a binary file to every tool that samples the first
+     few kilobytes: `file` said `data`, and a plain `grep -r` skipped it
+     silently. A pipe cannot shift the boundary either way: every value is a
+     hex shortId. */
+  const SEP = ' | ';
+  const current = [...sel.options].map((o) => `${o.value}${SEP}${o.textContent}`);
   const same = current.length === wanted.length
-    && wanted.every(([v, t], i) => `${v} ${t}` === current[i]);
+    && wanted.every(([v, t], i) => `${v}${SEP}${t}` === current[i]);
   if (!same) sel.replaceChildren(...wanted.map(([v, t]) => el('option', { value: v }, t)));
   if (state.pick) sel.value = state.pick.shortId;
 }
@@ -1084,13 +1091,23 @@ function areaWords(km2, km = null) {
  * and the published side); a seam carries everything it needs. js/cards.js's
  * Download and Copy buttons go through here rather than building markdown of
  * their own — one writer, so the file and the clipboard cannot disagree.
+ *
+ * BY THE PAIR, NEVER BY THE ID. A finding's id is a hash of its key and the
+ * session may widen one (js/session.js `resolveFindingIds`); matching a
+ * comparison's regions against it therefore MISSES, silently, and a miss hands
+ * `buildRegionBrief` two nulls — which is a brief that says "an unnamed author"
+ * seven times and "This side could not be read" twice, beside a card showing
+ * both authors correctly. The pair is two proposal ids the region carries
+ * verbatim, each pair is compared exactly once, and js/brief.js's own
+ * `comparisonFor` is the same two comparisons in the same order.
  */
 function brief(finding) {
   if (!finding) return '';
   const opts = { viewerUrl: `${location.origin}${location.pathname}` };
   if (finding.kind === 'seam') return buildSeamBrief(finding, opts);
   const comparison = state.comparisons.find((c) =>
-    (c.regions ?? []).some((r) => r.id === finding.id));
+    c.pair?.[0] === finding.proposalA && c.pair?.[1] === finding.proposalB)
+    ?? state.comparisons.find((c) => (c.regions ?? []).includes(finding));
   return buildRegionBrief(finding, comparison, opts);
 }
 
@@ -1100,9 +1117,17 @@ function brief(finding) {
  * Built HERE and not in js/export.js, for the same reason `brief()` is: the
  * engine's `buildSessionBrief` needs the session, the comparisons and the
  * seams, and this file is the only thing holding all three.
+ *
+ * It is handed the SAME `viewerUrl` one finding's brief gets — without it not
+ * one of the hundreds of briefs in the file links back, and the README promises
+ * every one of them does — and the session's own resolved, ranked findings, so
+ * the index is that one list rather than a second walk of the comparisons.
  */
 function sessionBrief() {
-  return buildSessionBrief(state.session, state.comparisons, state.seams);
+  return buildSessionBrief(state.session, state.comparisons, state.seams, {
+    viewerUrl: `${location.origin}${location.pathname}`,
+    findings: state.findings,
+  });
 }
 
 /** Every finding as one markdown file — the thing reviewers talk from. */
