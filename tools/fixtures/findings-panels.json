@@ -1,0 +1,350 @@
+{
+  "readme": "WP-D's own fixture for js/panels.js and js/cards.js. Three proposals shaped like docs/contracts.md § 2 (two over state:MT, one over state:WY for the seam's far side), three findings shaped like §§ 4-5 (a conflict, a one-sided region, a seam), marks like § 10 and one brief per finding as a plain markdown string. The geometry is invented squares inside Montana and Wyoming, small enough to read in a diff and real enough to fit on the map. A seam's sides name their proposal by `proposalId`, because JSON has no references: a harness resolves them before handing the seam to the panels. Nothing here is a real proposal and none of the authors exist.",
+  "week": "2026-09-08",
+
+  "proposals": [
+    {
+      "id": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+      "shortId": "aaaaaaaa",
+      "key": "state:MT@2026-09-08#aaaaaaaa",
+      "created": "2026-09-10T14:05:00.000Z",
+      "fileName": "usdm-proposal-2026-09-08-state-MT-aaaaaaaa.json.gz",
+      "source": null,
+      "sha256": null,
+      "baselineSha256": "7d1e8a25d863587fdd406a3b2dfa6fb71b4daacb42f5d17277b5dd8ccef53a25",
+      "week": "2026-09-08",
+      "nesting": null,
+      "validationPassed": true,
+      "warningCount": 0,
+      "aoi": {
+        "kind": "state",
+        "id": "state:MT",
+        "name": "Montana",
+        "bbox": [-110.0, 46.5, -106.0, 48.5],
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [[[[-110.0, 46.5], [-106.0, 46.5], [-106.0, 48.5], [-110.0, 48.5], [-110.0, 46.5]]]]
+        }
+      },
+      "author": {
+        "name": "Marla Teigen",
+        "email": "marla.teigen@example.edu",
+        "affiliation": "State Climate Office",
+        "role": "State climatologist",
+        "onBehalfOf": null
+      },
+      "patches": [
+        {
+          "key": "p-a1", "id": "p-a1", "seq": 1, "name": "Change 1",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[-109.0, 47.0], [-108.0, 47.0], [-108.0, 47.8], [-109.0, 47.8], [-109.0, 47.0]]]
+          },
+          "anchor": [-108.5, 47.4],
+          "bbox": [-109.0, 47.0, -108.0, 47.8],
+          "areaKm2": 6421.5,
+          "classes": [
+            { "class": "D2", "label": "Severe Drought", "direction": "grew", "category": "new", "phrase": "a new D2 area appeared" }
+          ],
+          "rationale": "**The Judith Basin benches.** Sixty-day precipitation is 41% of normal and the 90-day SPI sits near −1.4. Stock-water pits north of the Judith are at their lowest early-September levels since 2021.",
+          "groupId": null, "reviewed": false, "annotated": true
+        },
+        {
+          "key": "p-a2", "id": "p-a2", "seq": 2, "name": "Change 2",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[-107.6, 47.6], [-106.4, 47.6], [-106.4, 48.3], [-107.6, 48.3], [-107.6, 47.6]]]
+          },
+          "anchor": [-107.0, 47.95],
+          "bbox": [-107.6, 47.6, -106.4, 48.3],
+          "areaKm2": 7180.25,
+          "classes": [
+            { "class": "D3", "label": "Extreme Drought", "direction": "grew", "category": "edge-advanced", "phrase": "D3's edge advanced" }
+          ],
+          "rationale": "The Milk River supply was called back in late August, cutting the final cutting on most of the project's hay ground.",
+          "groupId": null, "reviewed": true, "annotated": true
+        }
+      ],
+      "changes": [
+        { "class": "D2", "label": "Severe Drought", "areaKm2": { "before": 18320.4, "after": 24741.9, "delta": 6421.5 }, "parts": { "before": 3, "after": 4 } },
+        { "class": "D3", "label": "Extreme Drought", "areaKm2": { "before": 4102.0, "after": 11282.25, "delta": 7180.25 }, "parts": { "before": 1, "after": 1 } }
+      ],
+      "edgeEffects": [
+        {
+          "patchKey": "p-a2", "seq": 2, "name": "Change 2",
+          "classes": ["D3"], "directions": ["grew"], "categories": ["edge-advanced"],
+          "phrases": ["D3's edge advanced"],
+          "neighborIds": ["state:WY"], "neighborNames": ["Wyoming"],
+          "segments": { "type": "MultiLineString", "coordinates": [[[-107.6, 46.5], [-106.4, 46.5]]] },
+          "lengthKm": 91.4,
+          "statement": "Suggesting an expansion of D3 along the Montana / Wyoming border (57 mi)."
+        }
+      ],
+      "justification": {
+        "format": "markdown",
+        "rationale": "This proposal asks for a one-class deterioration across two areas of central and northeastern Montana that our office monitors.\n\nThe **Judith Basin** and the **Milk River project** have gone six weeks without measurable rain.",
+        "impacts": "Water hauling is now routine in both areas, and our office has fielded eleven requests for emergency stock-water access this month against two in a normal September.",
+        "evidence": [
+          { "url": "https://www.drought.gov/states/montana", "label": "Drought.gov — Montana conditions and indicator maps" },
+          { "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "label": "Pit-level photograph, Judith Basin, 4 September" }
+        ],
+        "borderNotes": { "state:WY": "The D3 we are proposing runs to the state line at the 107th meridian; Wyoming's own reading of the Powder River country may differ." }
+      },
+      "edgeBrief": null,
+      "recheck": {
+        "grade": "pass", "ok": true, "problems": [], "residue": [],
+        "largestKm2": 0, "residueKm2": 0, "residueWidestM": 0,
+        "sentence": "Re-check: the package’s own geometry agrees with itself."
+      }
+    },
+
+    {
+      "id": "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+      "shortId": "bbbbbbbb",
+      "key": "state:MT@2026-09-08#bbbbbbbb",
+      "created": "2026-09-11T09:20:00.000Z",
+      "fileName": "usdm-proposal-2026-09-08-state-MT-bbbbbbbb.json.gz",
+      "source": null,
+      "sha256": null,
+      "baselineSha256": "7d1e8a25d863587fdd406a3b2dfa6fb71b4daacb42f5d17277b5dd8ccef53a25",
+      "week": "2026-09-08",
+      "nesting": null,
+      "validationPassed": true,
+      "warningCount": 1,
+      "aoi": {
+        "kind": "state",
+        "id": "state:MT",
+        "name": "Montana",
+        "bbox": [-110.0, 46.5, -106.0, 48.5],
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [[[[-110.0, 46.5], [-106.0, 46.5], [-106.0, 48.5], [-110.0, 48.5], [-110.0, 46.5]]]]
+        }
+      },
+      "author": {
+        "name": "Dana Reyes",
+        "email": "dana.reyes@example.org",
+        "affiliation": "Tribal Water Resources Office",
+        "role": "Tribal government",
+        "onBehalfOf": "Reservation Drought Response Team"
+      },
+      "patches": [
+        {
+          "key": "p-b1", "id": "p-b1", "seq": 1, "name": "Change 1",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[-109.2, 46.9], [-108.2, 46.9], [-108.2, 47.6], [-109.2, 47.6], [-109.2, 46.9]]]
+          },
+          "anchor": [-108.7, 47.25],
+          "bbox": [-109.2, 46.9, -108.2, 47.6],
+          "areaKm2": 5890.0,
+          "classes": [
+            { "class": "D0", "label": "Abnormally Dry", "direction": "shrank", "category": "edge-retreated", "phrase": "D0's edge retreated" }
+          ],
+          "rationale": "The 2–3 inches that fell on 30 August landed **south** of the Judith, not north of it. The benches our monitors sit on caught under half an inch, but the valley floor recovered.",
+          "groupId": null, "reviewed": false, "annotated": true
+        }
+      ],
+      "changes": [
+        { "class": "D0", "label": "Abnormally Dry", "areaKm2": { "before": 41200.0, "after": 35310.0, "delta": -5890.0 }, "parts": { "before": 2, "after": 3 } }
+      ],
+      "edgeEffects": [],
+      "justification": {
+        "format": "markdown",
+        "rationale": "We read the same rain gauges differently. This asks for a one-class improvement over the Judith Basin floor.",
+        "impacts": "Two community systems on the reservation's east side are back above their September median.",
+        "evidence": [
+          { "url": "https://www.nass.usda.gov/Statistics_by_State/Montana/", "label": "USDA NASS — Montana crop progress and condition" }
+        ],
+        "borderNotes": {}
+      },
+      "edgeBrief": null,
+      "recheck": {
+        "grade": "residue", "ok": true, "problems": [],
+        "residue": [{ "class": "D0", "areaKm2": 0.9493, "widthM": 9.11, "message": "0.37 mi² of derivedBands ⇒ D0 falls outside changes[].after (D0)." }],
+        "largestKm2": 0, "residueKm2": 0.9493, "residueWidestM": 9.11,
+        "sentence": "Re-check: agrees to within 0.37 mi² along shared edges — clipper residue, not an edit."
+      }
+    },
+
+    {
+      "id": "cccccccc-3333-4333-8333-cccccccccccc",
+      "shortId": "cccccccc",
+      "key": "state:WY@2026-09-08#cccccccc",
+      "created": "2026-09-11T16:40:00.000Z",
+      "fileName": null,
+      "source": "https://data.sustainable-fsa.com/usdm-examples/wy.json.gz",
+      "sha256": null,
+      "baselineSha256": "7d1e8a25d863587fdd406a3b2dfa6fb71b4daacb42f5d17277b5dd8ccef53a25",
+      "week": "2026-09-08",
+      "nesting": null,
+      "validationPassed": false,
+      "warningCount": 0,
+      "aoi": {
+        "kind": "state",
+        "id": "state:WY",
+        "name": "Wyoming",
+        "bbox": [-110.0, 44.5, -106.0, 46.5],
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [[[[-110.0, 44.5], [-106.0, 44.5], [-106.0, 46.5], [-110.0, 46.5], [-110.0, 44.5]]]]
+        }
+      },
+      "author": {
+        "name": "Ike Sandoval",
+        "email": "ike.sandoval@example.net",
+        "affiliation": "Powder River Conservation District",
+        "role": "Producer / land manager",
+        "onBehalfOf": null
+      },
+      "patches": [
+        {
+          "key": "p-c1", "id": "p-c1", "seq": 1, "name": "Change 1",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[-107.6, 45.9], [-106.4, 45.9], [-106.4, 46.5], [-107.6, 46.5], [-107.6, 45.9]]]
+          },
+          "anchor": [-107.0, 46.2],
+          "bbox": [-107.6, 45.9, -106.4, 46.5],
+          "areaKm2": 6104.75,
+          "classes": [
+            { "class": "D1", "label": "Moderate Drought", "direction": "shrank", "category": "edge-retreated", "phrase": "D1's edge retreated" }
+          ],
+          "rationale": "Sheridan and Clearmont both caught over two inches in the last week of August. The Powder River country came back.",
+          "groupId": null, "reviewed": false, "annotated": true
+        }
+      ],
+      "changes": [
+        { "class": "D1", "label": "Moderate Drought", "areaKm2": { "before": 22880.0, "after": 16775.25, "delta": -6104.75 }, "parts": { "before": 2, "after": 2 } }
+      ],
+      "edgeEffects": [
+        {
+          "patchKey": "p-c1", "seq": 1, "name": "Change 1",
+          "classes": ["D1"], "directions": ["shrank"], "categories": ["edge-retreated"],
+          "phrases": ["D1's edge retreated"],
+          "neighborIds": ["state:MT"], "neighborNames": ["Montana"],
+          "segments": { "type": "MultiLineString", "coordinates": [[[-107.6, 46.5], [-106.4, 46.5]]] },
+          "lengthKm": 91.4,
+          "statement": "Suggesting a reduction of D1 along the Wyoming / Montana border (57 mi)."
+        }
+      ],
+      "justification": {
+        "format": "markdown",
+        "rationale": "A one-class improvement over the Powder River country, up to the Montana line.",
+        "impacts": "Hay ground that was written off in July took a second cutting.",
+        "evidence": [],
+        "borderNotes": { "state:MT": "We improve to the line; Montana's proposal degrades to it. Somebody has to be wrong, and it may be us." }
+      },
+      "edgeBrief": null,
+      "recheck": {
+        "grade": "defect", "ok": false,
+        "problems": [
+          {
+            "message": "315 mi² of derivedBands ⇒ D1 falls outside changes[].after (D1). A derivedBands ⇒ D1 area must always sit inside changes[].after (D1).",
+            "class": "D1", "areaKm2": 815.2, "widthM": 498.0,
+            "geometry": { "type": "MultiPolygon", "coordinates": [[[[-107.6, 45.9], [-107.5, 45.9], [-107.5, 46.4], [-107.6, 46.4], [-107.6, 45.9]]]] }
+          },
+          {
+            "message": "The working area has no [west, south, east, north] envelope.",
+            "class": null, "areaKm2": null, "widthM": null, "geometry": null
+          }
+        ],
+        "residue": [],
+        "largestKm2": 815.2, "residueKm2": 0, "residueWidestM": 0,
+        "sentence": "Re-check: 2 problems, largest 315 mi²."
+      }
+    }
+  ],
+
+  "marks": [
+    { "proposalId": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa", "letter": "A", "dash": 0, "dasharray": null, "aoiId": "state:MT", "repeated": false },
+    { "proposalId": "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb", "letter": "B", "dash": 1, "dasharray": [2, 1.5], "aoiId": "state:MT", "repeated": false },
+    { "proposalId": "cccccccc-3333-4333-8333-cccccccccccc", "letter": "C", "dash": 0, "dasharray": null, "aoiId": "state:WY", "repeated": false }
+  ],
+
+  "findings": [
+    {
+      "id": "disc:1a2b3c4d",
+      "key": "disc|conflict|state:MT|D0|D2|D1|-109.000,46.900,-108.200,47.600",
+      "kind": "conflict",
+      "changedBy": "both",
+      "proposalA": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+      "proposalB": "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+      "classA": "D2",
+      "classB": "D0",
+      "published": "D1",
+      "magnitude": 2,
+      "directionA": "grew",
+      "directionB": "shrank",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [[[[-109.0, 47.0], [-108.2, 47.0], [-108.2, 47.6], [-109.0, 47.6], [-109.0, 47.0]]]]
+      },
+      "bbox": [-109.0, 47.0, -108.2, 47.6],
+      "areaKm2": 4062.9,
+      "anchor": [-108.6, 47.3],
+      "patchesA": ["p-a1"],
+      "patchesB": ["p-b1"],
+      "aoiId": "state:MT",
+      "aoiName": "Montana"
+    },
+    {
+      "id": "disc:5e6f7a8b",
+      "key": "disc|one-sided|state:MT|D2|D3|D2|-107.600,47.600,-106.400,48.300",
+      "kind": "one-sided",
+      "changedBy": "A",
+      "proposalA": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+      "proposalB": "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+      "classA": "D3",
+      "classB": "D2",
+      "published": "D2",
+      "magnitude": 1,
+      "directionA": "grew",
+      "directionB": "unchanged",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [[[[-107.6, 47.6], [-106.4, 47.6], [-106.4, 48.3], [-107.6, 48.3], [-107.6, 47.6]]]]
+      },
+      "bbox": [-107.6, 47.6, -106.4, 48.3],
+      "areaKm2": 7180.25,
+      "anchor": [-107.0, 47.95],
+      "patchesA": ["p-a2"],
+      "patchesB": [],
+      "aoiId": "state:MT",
+      "aoiName": "Montana"
+    },
+    {
+      "id": "seam:9c0d1e2f",
+      "key": "seam|state:MT|state:WY|aaaaaaaa|cccccccc|0",
+      "kind": "seam",
+      "neighbourId": "state:WY",
+      "reciprocal": true,
+      "isNew": true,
+      "maxStep": 2,
+      "lengthKm": 91.4,
+      "newStepKm": 61.2,
+      "aoiIds": ["state:MT", "state:WY"],
+      "anchor": [-107.0, 46.5],
+      "sideA": { "kind": "proposal", "proposalId": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa", "aoi": { "kind": "state", "id": "state:MT", "name": "Montana" } },
+      "sideB": { "kind": "proposal", "proposalId": "cccccccc-3333-4333-8333-cccccccccccc", "aoi": { "kind": "state", "id": "state:WY", "name": "Wyoming" } },
+      "runs": [
+        { "classA": "D3", "classB": "D1", "publishedA": "D2", "publishedB": "D2", "step": -2, "publishedStep": 0, "kind": "new", "lengthKm": 61.2, "from": [-107.6, 46.5], "to": [-106.9, 46.5], "midpoint": [-107.25, 46.5], "changedBy": "both" },
+        { "classA": "D2", "classB": "D2", "publishedA": "D2", "publishedB": "D2", "step": 0, "publishedStep": 0, "kind": "agree", "lengthKm": 30.2, "from": [-106.9, 46.5], "to": [-106.4, 46.5], "midpoint": [-106.65, 46.5], "changedBy": "neither" }
+      ],
+      "edgeEffects": [
+        { "statement": "Suggesting an expansion of D3 along the Montana / Wyoming border (57 mi)." },
+        { "statement": "Suggesting a reduction of D1 along the Wyoming / Montana border (57 mi)." }
+      ],
+      "borderNotes": {
+        "A": "The D3 we are proposing runs to the state line at the 107th meridian; Wyoming's own reading of the Powder River country may differ.",
+        "B": "We improve to the line; Montana's proposal degrades to it. Somebody has to be wrong, and it may be us."
+      }
+    }
+  ],
+
+  "briefs": {
+    "disc:1a2b3c4d": "# Conflict — Montana, week of 2026-09-08\n\nThis note was produced by a tool that compares proposed edits. It resolves nothing.\n\n- **Ground:** 1,569 mi², centred near 108.6° W, 47.3° N\n- **The published map has:** D1 · Moderate Drought\n- [Open in the viewer](https://example.invalid/?focus=disc:1a2b3c4d)\n\n## Side A — Marla Teigen (State Climate Office)\n\nProposes **D2 · Severe Drought**, one class worse than published.\n\n## Side B — Dana Reyes (Tribal Water Resources Office)\n\nProposes **D0 · Abnormally Dry**, one class better than published.\n\n## Questions for discussion\n\n1. The two readings disagree about where the 30 August rain fell. Is there a gauge between the two areas that settles it?\n2. Both cite range condition; do the two offices score it the same way?\n3. If neither reading can be ruled out, is the published D1 the honest answer for another week?\n",
+    "disc:5e6f7a8b": "# One-sided difference — Montana, week of 2026-09-08\n\n- **Ground:** 2,772 mi²\n- **The published map has:** D2 · Severe Drought\n\n## Side A — Marla Teigen\n\nProposes **D3 · Extreme Drought**.\n\n## Side B — Dana Reyes\n\nLeft as published. Dana Reyes did not propose a change here.\n\n## Questions for discussion\n\n- Did the second author look at this ground at all, or look and leave it?\n- Is the Milk River call-back enough on its own for a D3?\n- Does anything downstream depend on the difference?\n",
+    "seam:9c0d1e2f": "# Seam — Montana / Wyoming, week of 2026-09-08\n\n- **Shared border:** 57 mi, of which 38 mi carry a step the published map did not have\n- **Largest step:** 2 classes\n\n## Montana — Marla Teigen\n\nProposes **D3 · Extreme Drought** up to the line.\n\n## Wyoming — Ike Sandoval\n\nProposes **D1 · Moderate Drought** up to the line.\n\n## Questions for discussion\n\n1. A two-class step at a state line is almost never physical. Which side's gauges cover the border itself?\n2. The two proposals cite rain from the same week in opposite directions — is one of them reading a different gauge network?\n3. Would either author accept the other's class over the ten miles nearest the line?\n"
+  }
+}

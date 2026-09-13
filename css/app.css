@@ -428,6 +428,15 @@ body {
 }
 .legend-line.is-selected { border-top-color: var(--selection-ring); border-top-style: dashed; }
 
+/* The marks block sits under whichever ramp the view is showing, and it is a
+   different KIND of list — the ramps say what the ground is, these say who drew
+   it. A hairline is the flattest thing that reads as "a second list". */
+.legend-block.legend-marks {
+  margin-top: 0.875rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--border);
+}
+
 .legend-name { line-height: 1.35; }
 .legend-name .legend-sub { display: block; font-size: 0.6875rem; color: var(--text-dim); }
 
@@ -519,6 +528,15 @@ body {
 
 .side-patch { display: grid; gap: 0.1875rem; font-size: 0.75rem; }
 .side-patch > strong { font-size: 0.8125rem; }
+/* A grid stretches its children, and a Zoom button as wide as a column of prose
+   reads as a banner rather than as a control. It sizes to its label instead. */
+.side-patch > .nav-btn,
+.card-item > .nav-btn { justify-self: start; }
+
+/* The findings groups' "nothing here" note. It is a SIBLING of the <ol>, never
+   an item in it: a list whose one entry says "no items" has one item. */
+.findings-empty { margin-top: 0.375rem; }
+.findings-empty[hidden] { display: none; }
 
 /* Questions for discussion — the point of the card, and the thing the brief
    carries out of the browser. An <ol> because they are asked in an order. */
