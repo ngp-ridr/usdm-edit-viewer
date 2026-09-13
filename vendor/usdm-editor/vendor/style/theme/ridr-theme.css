@@ -1,0 +1,1320 @@
+/* ============================================================================
+   ngp-ridr/usdm-editor · vendor/style · theme/ridr-theme.css
+   The NGP RIDR web house style. A FORK of sustainable-fsa/style v0.2.0 —
+   see ../PROVENANCE.md for the upstream commit and the full list of deltas.
+
+   Source architecture: mt-climate-office/mco-web-style (MIT) — theme/mco-theme.css,
+   by way of sustainable-fsa/style. The layer order, the token contract, the
+   z-index ladder, the breakpoint ladder and the component anatomy are ported
+   one-for-one and re-skinned for NGP RIDR. Class namespace: .mco-* and .sfsa-*
+   both become .ridr-*.  (Do not write those two globs separated by a slash: the
+   resulting `*` + `/` closes this comment and silently drops the token block
+   below — which is exactly how this file shipped once.)
+
+   Layers, top to bottom:
+     0. Typography          — NO webfont; NGP RIDR uses the system stack
+     1. Design tokens       — light (:root, DEFAULT) + high-contrast
+     2. Stacking ladder     — z-index tiers for every floating surface
+     3. Reset & accessibility utilities
+     4. MapLibre control polish
+     5. Component shells    — navbar, buttons, range, toast, tooltip, modal,
+                              panel, card/sheet, combobox, drawer, scrim
+     6. Responsive & touch
+
+   TWO themes. NGP RIDR is a light-first brand: there is no dark theme, and the
+   high-contrast theme is WHITE-based (maximum contrast on paper-white).
+
+   ── NOT IN THIS FILE: the USDM color ramp ─────────────────────────────────
+   D0 #ffff00 · D1 #fcd37f · D2 #ffaa00 · D3 #e60000 · D4 #730000 are the US
+   Drought Monitor's own published encoding. They are DATA, not brand, they are
+   never re-skinned to match this palette, and they do not vary by theme. They
+   live in js/color.js. Because the ramp is hue-only and CVD-hostile, anything
+   drawn with it must carry a second channel (a printed class name), per §6.
+   ========================================================================== */
+
+/* ── 0. Typography ────────────────────────────────────────────────────────
+   NGP RIDR follows its own site (ngp-ridr.github.io) and ships NO webfont: the
+   system UI stack, with Georgia for the rare serif. Upstream self-hosted a
+   Roboto variable face; that @font-face, the fonts/ directory and the page's
+   font preload are all deliberately absent here.
+
+   Tradeoff, stated so nobody "fixes" it by accident: headings render in a
+   different face on macOS, Windows and Android, so the brand voice is a little
+   looser than a pinned webfont would give. Swapping one in later is a change to
+   --font-ui plus an @font-face — nothing else in the kit reads the font name.
+
+   --heading-weight is 800 rather than upstream's 900: system-ui resolves 900 to
+   a synthesized ultra-bold on several platforms, and the logo wordmark is a
+   plain bold grotesque, not an ultra. */
+
+/* ── 1. Design tokens ─────────────────────────────────────────────────────
+   LIGHT is the default theme and lives on bare :root — an unstyled page with
+   no `data-theme` attribute is already correct. `data-theme` on <html>
+   switches to high-contrast; the anti-flash snippet (snippets/anti-flash.html)
+   sets it before first paint.
+
+   Contrast contract, unchanged from upstream — but every NUMBER below was
+   re-measured against THIS palette. None were carried over.
+
+     --text-primary/-secondary/-muted/-dim   ≥ 4.5:1 on deep, surface AND raised
+     --accent-line                           ≥ 4.5:1 on all three (it is the
+                                               line/icon/text role AND the
+                                               prose-link color)
+     --ctrl-border                           ≥ 3:1 on all three (WCAG 1.4.11)
+     --text-on-accent                        ≥ 4.5:1 on --accent
+
+   Measured light matrix (deep #fafaf8 / surface #ffffff / raised #f1f2ee):
+
+     --text-primary   #1a1a1a   16.65  17.40  15.48
+     --text-secondary #333333   12.09  12.63  11.24
+     --text-muted     #4d4d4d    8.09   8.45   7.52
+     --text-dim       #5a5a5a    6.60   6.90   6.13
+     --ctrl-border    #6b6b6b    5.10   5.33   4.74   (non-text, needs 3:1)
+     --accent         #2c5f2e    7.22   7.54   6.71   (FILL; white on it 7.54)
+     --accent-line    #2c5f2e    7.22   7.54   6.71
+     --accent-light   #4a8f4d    3.77   3.94   3.51   (line/graphic grade ONLY)
+     --accent-dk      #1f4620   10.28  10.74   9.55
+     --ochre          #c97d2a    3.12   3.26   2.90   (FILL/graphic grade ONLY)
+     --ochre-dark     #8a5417    5.98   6.25   5.56
+     --selection-ring #1f3f9e    8.88   9.28   8.25
+
+   THREE traps this palette walks around, all inherited from the NGP RIDR site's
+   own CSS. Do not "restore" the site values:
+
+     · The site's --color-text-muted #6b6b6b measures 4.74:1 on --bg-raised.
+       That clears AA-small by a hair on one surface and is the exact failure
+       mode upstream documents. --text-muted is #4d4d4d here; #6b6b6b survives
+       only as --ctrl-border, where the bar is 3:1.
+     · The site's amber --color-accent #c97d2a is 3.26:1, and WHITE ON IT is
+       3.26:1 — it can carry neither text nor a control edge, in either
+       direction. It is --ochre, a graphic fill. Its text/line grade is
+       --ochre-dark #8a5417. The BUTTON accent is the green.
+     · --selection-ring is the logo's blue. It is the only hue in the palette
+       that stays legible against the whole USDM ramp, yellow through dark red;
+       a green or amber ring disappears into D1/D2. */
+:root {
+  /* Theme-independent tokens — no theme variant, so exempt from the
+     both-blocks parity rule below. */
+  --font-ui:        system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-serif:     Georgia, "Times New Roman", serif;
+  --font-mono:      ui-monospace, SFMono-Regular, Menlo, monospace;
+  --heading-weight: 800;
+  --radius-sm:      4px;      /* matches the NGP RIDR site's --radius */
+  --radius-md:      8px;
+  --radius-lg:      12px;
+  --transition:     0.2s cubic-bezier(0.4,0,0.2,1);
+  /* Height of a docked bottom sheet (.ridr-card under compact). JS stamps the
+     live value on :root while a sheet is open so bottom-corner UI lifts above
+     it; the 0px default keeps every calc() inert until then. */
+  --sheet-h:        0px;
+  /* Width of the desktop control drawer (.ridr-drawer). A dimension, so no
+     theme variant — and a slot an app may override on its own :root, because
+     the drawer's width, the margin it slides out by and the resting position of
+     its edge tab are ALL derived from this one value. */
+  --drawer-w:       272px;
+
+  /* ---- Themed tokens. EVERY token below must also exist in the
+     [data-theme="high-contrast"] block. ---- */
+
+  --bg-deep:        #fafaf8;  /* site ground — page and map canvas          */
+  --bg-surface:     #ffffff;  /* cards, modal, navbar, footer               */
+  --bg-raised:      #f1f2ee;  /* inset wells inside a surface               */
+  --border:         #dddddd;  /* decorative hairline — NOT a control edge   */
+  --border-glass:   rgba(26,26,26,0.08);
+  --text-primary:   #1a1a1a;  /* 16.65 deep · 17.40 surface · 15.48 raised  */
+  --text-secondary: #333333;  /* 12.09 · 12.63 · 11.24                      */
+  --text-muted:     #4d4d4d;  /*  8.09 ·  8.45 ·  7.52                      */
+  --text-dim:       #5a5a5a;  /*  6.60 ·  6.90 ·  6.13                      */
+  --ctrl-border:    #6b6b6b;  /* control edges — 4.74:1 worst case, ≥3:1 ✓  */
+  --accent:         #2c5f2e;  /* prairie green. FILL; white on it 7.54:1    */
+  --accent-light:   #4a8f4d;  /* 3.51:1 worst case — hover/line grade only  */
+  --accent-dk:      #1f4620;  /* pressed/hover fill; white on it 10.74:1    */
+  --accent-line:    #2c5f2e;  /* lines, icons, text, links                  */
+  --accent-hover:   rgba(44,95,46,0.08);
+  --text-on-accent: #ffffff;
+  --selection-ring: #1f3f9e;  /* logo blue, over a 1px white casing         */
+  --selection-casing: 1px;    /* casing width the map JS draws under the ring */
+  --sage:           #4a8f4d;  /* 3.51:1 — line/graphic grade only           */
+  --sage-dark:      #2c5f2e;  /* 6.71:1 — text grade                        */
+  --ochre:          #c97d2a;  /* dry-grass amber. 3.26:1 — FILL/graphic ONLY */
+  --ochre-dark:     #8a5417;  /* 5.56:1 — eyebrows, panel titles, amber text */
+  --brand-gradient: linear-gradient(90deg, #1f4620, #2c5f2e, #4a8f4d, #2c5f2e, #1f4620);
+  --glass:          rgba(255,255,255,0.90);
+  --shadow:         0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --scrim:          rgba(0,0,0,0.35);
+  --input-bg:       #ffffff;
+  --ctrl-icon-filter: none;   /* vendor glyphs are dark; light theme keeps them */
+  --map-bg:         #fafaf8;  /* matches --bg-deep so the map dissolves into the page */
+  --map-state-line: #ffffff;
+  /* County outlines read as noise over the USDM fills at national zoom. The
+     county layer is always present; this token's low alpha is what hides it.
+     The high-contrast block swaps in a solid color. */
+  --map-county-line: rgba(26,26,26,0.25);
+  /* FORK ADDITION. Tribal-area outlines, drawn always, beside the county lines.
+     The hue follows mco-web-style's `tribalLine` (see
+     ~/git/mt-climate-office/mco-web-style/map/mco-map.js) so a reader who knows
+     the Montana Climate Office's maps recognises the mark here; the alpha is
+     baked in for the same reason --map-dim's is, one token carrying the whole
+     appearance. NO MATCHING FILL: mco-web-style also tints the interior, and
+     this app may not — nothing paints a fill over the USDM classes. A slightly
+     warmer, slightly stronger line than the county grade, because a tribal area
+     is a JURISDICTION an author may scope work to rather than a reference grid. */
+  --map-tribal-line: rgba(122,79,36,0.55);
+  /* FORK ADDITION (see PROVENANCE.md §6). The knockdown painted OUTSIDE an
+     area of interest, and the only fill this app is allowed to lay over a map
+     that carries the USDM ramp — because it never touches the AOI itself. The
+     alpha is BAKED IN rather than left to `fill-opacity`, so one token carries
+     the whole appearance and a MapLibre paint can read it with no second
+     property to keep in step. A pale wash on a pale basemap: enough to say
+     "not here", not enough to hide what is there. */
+  --map-dim:        rgba(250,250,248,0.55);
+  /* FORK ADDITION. The reachable-band outline: while a SCOPED verb is armed,
+     the boundary of the one band the gesture can act on — the positive half of
+     --map-dim's knockdown. A LINE, never a fill. Teal on purpose: not
+     --selection-ring (a scope is not a selection), not --text-primary (that
+     pair already carries the AOI dash and the patch outlines), and no hue the
+     USDM ramp uses. */
+  --map-reach-line: #0f5e66;
+  /* Data-encoding, not chrome: the "no data" fill. A legend must pair it with
+     a text label — color alone is never the only channel (§6). */
+  --no-data:        #cccccc;
+}
+
+/* High-contrast. WHITE-based maximum contrast, not an inverted screen: this is
+   a light-first brand, and a reader who asks for more contrast on a cream page
+   expects paper-white and ink. Surfaces go pure white, text pure black, the
+   greens darken so fill and line converge, --shadow drops out entirely and
+   borders carry the structure instead, and --glass goes near-opaque because a
+   blurred translucent panel cannot GUARANTEE a ratio over arbitrary map
+   content. County outlines switch on so polygon shape survives without color.
+
+   The amber moves furthest: --ochre becomes #8a5417 (the light theme's
+   --ochre-dark), because #c97d2a cannot be made to work at this contrast level
+   in any role. Anything relying on the amber READING as amber degrades to a
+   brown here — that is the correct trade, and the USDM ramp is untouched
+   either way.
+
+   Measured (all on #ffffff; raised #f0f0f0 in parentheses):
+     --text-primary  #000000  21.00 (18.43)   --text-secondary #111111 18.88 (16.57)
+     --text-muted    #1a1a1a  17.40 (15.27)   --text-dim       #333333 12.63 (11.09)
+     --accent        #1f4620  10.74  (9.42)   --accent-line    #163216 13.98 (12.27)
+     --ochre         #8a5417   6.25  (5.48)   --ochre-dark     #6b4211  8.70  (7.64)
+     white on --accent 10.74                  white on --accent-dk 13.98 */
+[data-theme="high-contrast"] {
+  --bg-deep:        #ffffff;
+  --bg-surface:     #ffffff;
+  --bg-raised:      #f0f0f0;
+  --border:         #1a1a1a;
+  --border-glass:   rgba(0,0,0,0.35);
+  --text-primary:   #000000;
+  --text-secondary: #111111;
+  --text-muted:     #1a1a1a;
+  --text-dim:       #333333;
+  --ctrl-border:    #1a1a1a;
+  --accent:         #1f4620;
+  --accent-light:   #2c5f2e;
+  --accent-dk:      #163216;
+  --accent-line:    #163216;
+  --accent-hover:   rgba(31,70,32,0.12);
+  --text-on-accent: #ffffff;
+  --selection-ring: #000000;
+  --selection-casing: 1.5px;
+  --sage:           #2c5f2e;
+  --sage-dark:      #1f4620;
+  --ochre:          #8a5417;
+  --ochre-dark:     #6b4211;
+  --brand-gradient: linear-gradient(90deg, #163216, #1f4620, #2c5f2e, #1f4620, #163216);
+  --glass:          rgba(255,255,255,0.98);
+  --shadow:         none;
+  --scrim:          rgba(0,0,0,0.6);
+  --input-bg:       #ffffff;
+  --ctrl-icon-filter: none;
+  --map-bg:         #ffffff;
+  --map-state-line: #000000;
+  --map-county-line: #1a1a1a;
+  /* Paper-and-ink: the brown drops out and the line separates by weight alone,
+     which is also why js/layers.js gives it its own width rather than sharing
+     the county one. */
+  --map-tribal-line: #4a2f14;
+  /* Stronger here, and pure white rather than the cream: high contrast is
+     paper-and-ink, so "outside the working area" has to separate from "inside"
+     by more than a hint. */
+  --map-dim:        rgba(255,255,255,0.70);
+  /* Darker ink for paper-and-ink, same hue so the mark keeps its identity. */
+  --map-reach-line: #073c42;
+  --no-data:        #d9d9d9;  /* pair with an outline, not just the fill */
+}
+
+/* ── 2. Stacking ladder ───────────────────────────────────────────────────
+   Ported verbatim from mco-theme.css — the tiers are deliberately identical
+   across the two kits so a component can move between them unchanged.
+
+   One ladder for every floating surface. Add to a tier — don't invent a
+   number. MapLibre's own .maplibregl-ctrl-* containers ship with z-index 2
+   from the vendor stylesheet, so anything meant to sit over the map controls
+   (notably map popups, which ship with NO z-index) has to be above that.
+   The detail tier stays BELOW the chrome so a docked detail surface can never
+   cover the navbar; <dialog> lives in the browser's top layer and outranks
+   all of these regardless.
+
+   TWO SCRIMS, TWO TIERS, on purpose. `.ridr-scrim` is viewport-fixed and rides
+   at --z-map-panel (40) with the docked panels: it dims the whole window.
+   --z-drawer-scrim (65) is for `.ridr-drawer-scrim`, which is absolute inside
+   the app's positioned map row — high enough to dim an open detail surface
+   (60), low enough to stay under the drawer that raised it (70), and it never
+   reaches the navbar above it. NEW in this kit; mco-theme.css has one scrim.
+
+   --z-tour (300) is the USDM Editor's addition, and it is HERE rather than in
+   css/app.css because its value is a claim about THIS ladder: the spotlight
+   walkthrough (js/tour.js) has to cover the drawer, the detail card and the
+   navbar it points at, and stay under a toast that may fire while it is up.
+   A number picked next to app layout could not see any of those neighbours. */
+:root {
+  --z-map-ctrl:      2;   /* vendor .maplibregl-ctrl-* containers          */
+  --z-map-notice:   20;   /* empty-state / error callouts over the map     */
+  --z-map-progress: 30;   /* loading bars and notes                        */
+  --z-map-panel:    40;   /* docked panels (legend, sidebar) + scrim       */
+  --z-detail:       60;   /* docked detail surface (.ridr-card / sheet)    */
+  --z-drawer-scrim: 65;   /* scrim under a drawer, over the sheet          */
+  --z-drawer:       70;   /* off-canvas drawer, over the detail surface    */
+  --z-chrome:       90;   /* secondary chrome bars                         */
+  --z-chrome-top:  100;   /* navbar                                        */
+  --z-flyout:      150;   /* dropdowns / combobox results                  */
+  --z-cursor:      200;   /* pointer-following tooltip                     */
+  --z-tour:        300;   /* spotlight walkthrough, over all the chrome    */
+  --z-toast:       400;   /* toast — above everything                      */
+}
+
+/* ── 3. Reset & accessibility utilities ──────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  transition: background var(--transition), color var(--transition);
+}
+
+/* Headings run at --heading-weight (800). With the system stack that is a real
+   bold on every platform rather than a synthesized ultra, which 900 is on
+   several. Components that need a lighter heading (the navbar eyebrow, panel
+   titles) set their own weight by class, which outranks these element
+   selectors. */
+h1, h2, h3, h4, h5, h6 { font-weight: var(--heading-weight); line-height: 1.2; }
+
+/* Reduced motion: blanket CSS clamp. Map camera animations are a JS concern —
+   gate them with a live media-query check, never a boot snapshot. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration:  0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* The UA's [hidden] { display: none } loses to any rule that sets display
+   explicitly, so flex/grid elements stay visible as empty strips when hidden
+   from JS. Restate it with priority. */
+[hidden] { display: none !important; }
+
+/* Visually-hidden text for screen-reader announcements + skip-link targets. */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important; height: 1px !important;
+  padding: 0 !important; margin: -1px !important;
+  overflow: hidden !important; clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important; border: 0 !important;
+}
+
+/* ONE universal keyboard focus ring — the only focus rule in the kit. Never
+   enumerate per-selector rules: a control added later would ship without one.
+   --accent clears 3:1 against every surface in both themes (5.20 on cream,
+   7.99 on high-contrast white), so it is safe as a non-text indicator. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Skip link (WCAG 2.4.1): first focusable element on the page, jumps past the
+   chrome. Markup in snippets/skip-link.html. */
+.ridr-skip-link {
+  position: fixed; left: 0.5rem; top: -100px;
+  z-index: calc(var(--z-toast) + 10);
+  padding: 0.5rem 0.9rem;
+  background: var(--accent); color: var(--text-on-accent);
+  border-radius: var(--radius-md);
+  font-weight: 700; font-size: 0.85rem; text-decoration: none;
+}
+.ridr-skip-link:focus { top: 0.5rem; }
+
+/* ── 4. MapLibre control polish ───────────────────────────────────────────
+   Glass treatment for the vendor controls so they read as part of the app
+   chrome. --ctrl-icon-filter exists for parity with mco-theme.css (which
+   inverts the vendor's dark glyphs on dark themes); both NGP RIDR
+   themes are light, so it resolves to `none` in both — kept so a consumer can
+   override it and so the selector list matches MCO's. */
+.maplibregl-map { background: var(--map-bg); }
+
+.maplibregl-ctrl-group {
+  background: var(--glass) !important;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--ctrl-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow) !important;
+  transition: background var(--transition), border-color var(--transition);
+}
+.maplibregl-ctrl-group button {
+  background: transparent !important;
+  border-color: var(--ctrl-border) !important;
+  transition: background var(--transition);
+}
+.maplibregl-ctrl-group button:hover { background: var(--accent-hover) !important; }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: var(--ctrl-icon-filter, none); }
+/* Icon for a "zoom to full extent" control. The stroke is dark like the vendor
+   icons so --ctrl-icon-filter would flip it in lockstep with them. */
+.maplibregl-ctrl-fit .maplibregl-ctrl-icon {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23202020' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='4 8 4 4 8 4'/><polyline points='20 8 20 4 16 4'/><polyline points='4 16 4 20 8 20'/><polyline points='20 16 20 20 16 20'/></svg>");
+  background-size: 60% 60%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.maplibregl-ctrl-attrib { background: var(--glass) !important; color: var(--text-muted) !important; }
+/* Attribution links are UNDERLINED, not color-only. mco-theme.css sets only a
+   color here — a known WCAG 1.4.1 defect (link-in-text-block: color alone is
+   not a sufficient channel for CVD users). Fixed in this kit from day one. */
+.maplibregl-ctrl-attrib a {
+  color: var(--accent-line) !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.maplibregl-ctrl-attrib a:hover { text-decoration-thickness: 2px; }
+.maplibregl-ctrl-attrib button.maplibregl-ctrl-attrib-button { filter: var(--ctrl-icon-filter, none); }
+/* Vendor default is 2; restated so the whole stacking ladder is greppable.
+   With viewport-fit=cover the corner containers need the safe-area insets
+   themselves, or the attribution lands under the home indicator. NOTE:
+   env() is inert unless the page sets viewport-fit=cover in its viewport
+   meta — see snippets/head.html. */
+.maplibregl-ctrl-top-left, .maplibregl-ctrl-top-right,
+.maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right {
+  z-index: var(--z-map-ctrl);
+}
+/* --sheet-h lifts the bottom corners clear of an open bottom sheet (§5
+   .ridr-card). It defaults to 0px, so this is a no-op until JS stamps it. */
+.maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right {
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--sheet-h, 0px));
+  transition: padding-bottom var(--transition);
+}
+.maplibregl-ctrl-top-left, .maplibregl-ctrl-bottom-left { padding-left: env(safe-area-inset-left); }
+.maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-right { padding-right: env(safe-area-inset-right); }
+
+/* ── 5. Component shells ──────────────────────────────────────────────────── */
+
+/* Navbar. Structure:
+     .ridr-navbar > .logo-link + .nav-divider + .brand + .controls + .nav-meta
+
+   DELTA vs mco-theme.css: the bar is opaque --bg-surface (white), not the MCO
+   glass-dark treatment. The NGP RIDR identity is a white header with a
+   hairline rule (see the org site's _includes/header.html), and the wide
+   banner lockup is drawn on white — a translucent bar would tint it. */
+.ridr-navbar {
+  flex-shrink: 0;
+  position: relative;
+  /* --nav-gap drives BOTH the flex gap and the lockup divider's negative
+     margin, so the brand rhythm survives any change to the gap (§6 tightens it
+     at ≤1060px). Overriding the gap directly would desynchronise them. */
+  --nav-gap: 0.75rem;
+  display: flex; align-items: center; gap: var(--nav-gap);
+  /* Left padding matches the vertical padding so the 40px logo lockup sits
+     with square margins in the 52px bar (≈6px on all three sides). */
+  padding: 0.4rem max(1rem, env(safe-area-inset-right)) 0.4rem max(0.4rem, env(safe-area-inset-left));
+  min-height: 52px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; row-gap: 0.4rem;
+  z-index: var(--z-chrome-top);
+}
+.ridr-navbar::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+  height: 2px; background: var(--brand-gradient); pointer-events: none;
+}
+
+/* Brand lockup images. Two SIBLING <img> elements inside one .logo-link,
+   toggled by a pure-CSS breakpoint swap (§6, ≤750px) — no JS, no srcset, and
+   no layout shift, because each is sized explicitly:
+
+     <a class="logo-link" href="/" aria-label="NGP RIDR — home">
+       <img class="banner-img" src="…/sustainable-fsa-banner.svg"
+            alt="NGP RIDR" width="1225" height="350">
+       <img class="badge-img"  src="…/sustainable-fsa-badge.svg" alt="" aria-hidden="true">
+     </a>
+
+   Give the WIDE banner the real alt text and the badge an empty one: the two
+   never show at once, and the link's aria-label names it either way.
+   The banner's intrinsic 1225×350 means a 40px height renders 140px wide. */
+.logo-link { display: flex; align-items: center; flex-shrink: 0; }
+.logo-link > img.banner-img { height: 40px; width: auto; display: block; }
+.logo-link > img.badge-img  { height: 40px; width: 40px; border-radius: 6px; display: none; }
+
+.nav-divider { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
+/* The brand lockup reads as one unit: pull the divider in so logo ↔ divider ↔
+   title sit at 0.4rem — the same rhythm as the squared 0.4rem edge margins —
+   while the full navbar gap resumes after the lockup. Derived from --nav-gap
+   rather than hard-coded, so tightening the gap can't squeeze the lockup: at
+   the 0.75rem default this is −0.35rem, and at the ≤1060px 0.5rem gap it
+   becomes −0.1rem, holding the 0.4rem rhythm either way. */
+.ridr-navbar > .nav-divider { margin-inline: calc(0.4rem - var(--nav-gap)); }
+.brand { display: flex; flex-direction: column; justify-content: center; flex-shrink: 0; line-height: 1.2; }
+.brand-title    { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; margin: 0; }
+.brand-subtitle { font-size: 0.55rem; font-weight: 400; letter-spacing: 0.04em; font-style: italic; color: var(--text-dim); white-space: nowrap; }
+.controls { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; row-gap: 0.3rem; }
+.nav-meta { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; margin-left: auto; }
+/* <label> naming a control in the bar. Shed VISUALLY at ≤1400px (§6). */
+.control-label { font-size: 0.7rem; font-weight: 500; color: var(--text-muted); white-space: nowrap; }
+
+/* Buttons. Hover/pressed borders use --accent-line, not --accent: on a light
+   ground the two are close in weight, but keeping the MCO discipline means an
+   app can restyle --accent (a fill) without silently weakening a border. */
+.nav-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 12px; min-height: 34px;
+  border: 1px solid var(--ctrl-border); border-radius: var(--radius-md);
+  background: none; color: var(--text-secondary);
+  cursor: pointer; font-size: 0.78rem; font-weight: 500;
+  font-family: inherit; white-space: nowrap; flex-shrink: 0;
+  transition: var(--transition);
+}
+.nav-btn:hover { background: var(--accent-hover); border-color: var(--accent-line); color: var(--text-primary); }
+.nav-btn svg { flex-shrink: 0; stroke: currentColor; }
+.nav-btn.icon-only { padding: 0.4rem; min-width: 34px; justify-content: center; }
+.nav-btn[aria-pressed="true"] { background: var(--accent-hover); border-color: var(--accent-line); color: var(--text-primary); }
+.nav-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.nav-btn[disabled]:hover { background: none; border-color: var(--ctrl-border); color: var(--text-secondary); }
+
+.ridr-btn-info {
+  border-radius: 50%; border-color: var(--accent-line);
+  color: var(--accent-line); font-size: 1rem; font-weight: 700;
+  padding: 0; width: 34px; height: 34px; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.ridr-btn-info:hover {
+  background: var(--accent); border-color: var(--accent-dk);
+  color: var(--text-on-accent);
+}
+
+/* Segmented buttons: a .nav-btn group with fused borders. Deliberately a
+   step shorter than the 34px nav buttons — a same-height fused group reads
+   as heavy in the bar; flex centering keeps the baselines aligned. */
+.seg-btns { display: flex; gap: 0; }
+.seg-btn {
+  padding: 4px 10px; min-height: 30px; height: 30px;
+  border-radius: 0; border-right-width: 0;
+  font-size: 0.74rem; font-weight: 600;
+}
+.seg-btn:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.seg-btn:last-child  { border-radius: 0 var(--radius-md) var(--radius-md) 0; border-right-width: 1px; }
+/* Pressed state is a FILL (--accent) carrying --text-on-accent at 5.56:1, not
+   a tint: the pressed segment must be unmistakable without relying on hue. */
+.seg-btn[aria-pressed="true"] {
+  background: var(--accent); border-color: var(--accent-dk);
+  color: var(--text-on-accent);
+}
+.seg-btn[aria-pressed="true"]:hover { background: var(--accent-dk); color: var(--text-on-accent); }
+
+/* Range control + live output. NEW in this kit (mco-theme.css ships none).
+   Cross-browser: WebKit/Blink style the thumb through ::-webkit-slider-thumb
+   on an appearance:none input; Firefox uses ::-moz-range-thumb. The two
+   pseudo-elements CANNOT share a rule — a selector list containing an unknown
+   pseudo-element is dropped whole — so every thumb declaration is written
+   twice on purpose. Do not "tidy" them together.
+
+   Structure:  .ridr-range > label.control-label + input[type=range] + output */
+.ridr-range { display: flex; align-items: center; gap: 0.5rem; }
+.ridr-range > output {
+  font-family: var(--font-mono);
+  font-size: 0.72rem; font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 5ch; text-align: right;
+}
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; min-width: 7rem;
+  /* Height IS the touch target: the track is drawn 4px tall inside it, and the
+     padding around the track comes from this box (bumped to 40px under
+     hover:none in §6). */
+  height: 24px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: var(--ctrl-border);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px; border-radius: 2px;
+  background: var(--ctrl-border);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-surface);   /* casing keeps the thumb legible on any track */
+  box-shadow: 0 0 0 1px var(--accent-dk);
+  margin-top: -7px;                      /* centre the 18px thumb on the 4px track */
+  transition: background var(--transition);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--accent-dk);
+  transition: background var(--transition);
+}
+input[type="range"]:hover::-webkit-slider-thumb { background: var(--accent-light); }
+input[type="range"]:hover::-moz-range-thumb     { background: var(--accent-light); }
+input[type="range"][disabled] { cursor: not-allowed; opacity: 0.45; }
+
+/* Refresh/liveness status: read-only, deliberately subordinated. Add .static
+   when the view isn't live (historical modes) to stop the pulse. The dot uses
+   --sage (3.48:1 on cream): a ≤6px dot is a non-text graphical object, so 3:1
+   is the bar — never put TEXT in --sage, that is --sage-dark's job. */
+.refresh-status {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem; color: var(--text-muted);
+  white-space: nowrap;
+  padding: 0 4px;
+}
+.refresh-status .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--sage);
+  box-shadow: 0 0 0 2px var(--accent-hover);
+  animation: ridr-refresh-pulse 2.4s ease-in-out infinite;
+}
+@keyframes ridr-refresh-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .refresh-status .dot { animation: none; }
+}
+.refresh-status.static .dot { animation: none; box-shadow: none; background: var(--text-dim); }
+
+/* Toast. One per page. --sheet-h keeps it above an open bottom sheet. */
+.ridr-toast {
+  position: fixed; bottom: calc(1.5rem + var(--sheet-h, 0px)); left: 50%;
+  transform: translateX(-50%) translateY(0.75rem);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent-line);
+  border-radius: 6px; padding: 0.5rem 1rem;
+  font-size: 0.82rem; color: var(--text-primary);
+  opacity: 0; transition: opacity 0.2s, transform 0.2s, bottom var(--transition);
+  pointer-events: none; z-index: var(--z-toast);
+  box-shadow: var(--shadow);
+}
+.ridr-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Pointer-following tooltip. Decorative for AT: keep it aria-hidden and route
+   the same content through a live region. */
+.ridr-tooltip {
+  position: fixed;
+  background: var(--glass);
+  border: 1px solid var(--accent-line);
+  border-radius: 5px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem; font-weight: 500;
+  color: var(--text-primary);
+  pointer-events: none;
+  z-index: var(--z-cursor);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.1s;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+}
+.ridr-tooltip.visible { opacity: 1; }
+.ridr-tooltip .tooltip-name { font-size: 0.78rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+.ridr-tooltip .tooltip-sub {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.ridr-tooltip .tooltip-val {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--accent-line);
+  font-weight: 700;
+  margin-top: 3px;
+}
+
+/* Modal: native <dialog class="ridr-modal">. Wire it so a backdrop click
+   closes and focus returns to the opener. */
+.ridr-modal { background: transparent; border: none; padding: 1rem; position: fixed; inset: 0; margin: auto; width: fit-content; height: fit-content; max-width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); }
+.ridr-modal::backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+.info-modal-box {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 10px; width: min(540px, calc(100vw - 4rem));
+  max-height: calc(100dvh - 4rem); overflow-y: auto;
+  padding: 1.5rem; box-shadow: var(--shadow);
+}
+.info-modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; gap: 1rem; }
+.info-modal-title    { font-size: 1.05rem; font-weight: var(--heading-weight); color: var(--text-primary); margin: 0; }
+.info-modal-subtitle { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
+.modal-close { display: flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--ctrl-border); border-radius: 6px; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; line-height: 1; flex-shrink: 0; min-width: 34px; min-height: 34px; transition: var(--transition); }
+.modal-close:hover { color: var(--text-primary); border-color: var(--accent-line); background: var(--accent-hover); }
+.info-section { margin-bottom: 1.25rem; }
+.info-section:last-child { margin-bottom: 0; }
+/* Section eyebrow in --ochre-dark (4.91:1 on cream, 5.25:1 on white) — the
+   brand's secondary heading color. */
+.info-section h3 { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ochre-dark); margin-bottom: 0.5rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+.info-section p, .info-section ul { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; }
+.info-section ul { padding-left: 1.1rem; }
+.info-section li { margin-bottom: 0.2rem; }
+/* Links inside prose are underlined, not color-only (WCAG 1.4.1 —
+   link-in-text-block). Color alone fails for CVD users; hover-only
+   underlines don't count. */
+.info-section a { color: var(--accent-line); text-decoration: underline; text-underline-offset: 2px; }
+.info-section a:hover { text-decoration-thickness: 2px; }
+.info-section kbd {
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--text-primary);
+}
+.info-section code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--bg-raised);
+  border-radius: 3px;
+  padding: 1px 4px;
+  color: var(--text-primary);
+}
+/* Tables in help copy. ui/help.js turns GFM tables ON, and help copy in this
+   fleet is mostly tables, so they need a house look: hairline row rules in
+   --border, a quiet left-aligned header row, no zebra, no vertical rules.
+
+   NO SCROLL CONTAINER OF ITS OWN. The usual responsive-table trick
+   (display:block + overflow-x:auto) makes the table a scrollable region with
+   nothing focusable inside it, which axe flags as scrollable-region-focusable
+   (SERIOUS) the moment a table really is too wide. Instead the cells wrap and
+   the table never exceeds its column; anything genuinely unwrappable (a long
+   URL in a code cell) falls to .info-modal-box, which already scrolls and
+   holds the close button, so it is keyboard-reachable. */
+.ridr-modal .info-section table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.ridr-modal .info-section th,
+.ridr-modal .info-section td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+.ridr-modal .info-section th { font-weight: 700; color: var(--text-secondary); }
+.ridr-modal .info-section tr:last-child td { border-bottom: none; }
+
+/* Floating glass panel (legend, filter dock, …). The toggle carries
+   aria-expanded and the body gets [hidden] once collapsed. Structure:
+     .ridr-panel > .ridr-panel-head (> .ridr-panel-title + .ridr-panel-toggle)
+                 + .ridr-panel-body */
+.ridr-panel {
+  position: absolute;
+  background: var(--glass);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  z-index: var(--z-map-panel);
+  max-width: min(320px, calc(100vw - 2rem));
+}
+.ridr-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+}
+.ridr-panel-title {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ochre-dark);
+}
+.ridr-panel-toggle {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex-shrink: 0;
+  background: none; border: 1px solid var(--ctrl-border); border-radius: var(--radius-sm);
+  color: var(--text-dim); cursor: pointer; font-family: inherit;
+  transition: var(--transition);
+}
+.ridr-panel-toggle:hover { color: var(--text-primary); border-color: var(--accent-line); background: var(--accent-hover); }
+/* The caret shows the ACTION, not the state (markup glyph is an up-chevron):
+   expanded → points down ("collapse toward the bottom dock"); collapsed →
+   points up ("expand upward"). */
+.ridr-panel-toggle svg { transition: transform var(--transition); transform: rotate(180deg); }
+.ridr-panel-toggle[aria-expanded="false"] svg { transform: none; }
+/* Collapse is animated (slide + fade), then the collapse helper sets [hidden]
+   so collapsed content leaves the tab order. The max-height cap comfortably
+   fits house panels; raise it locally for an unusually tall one. Reduced
+   motion clamps the transition. */
+.ridr-panel-body {
+  padding: 0 0.75rem 0.75rem;
+  max-height: 500px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height var(--transition), opacity var(--transition);
+}
+.ridr-panel-body.is-collapsing { max-height: 0; opacity: 0; }
+
+/* Detail card. NEW in this kit (mco-theme.css has no card; MCO apps hand-roll
+   a "station sheet" each time). It is a glass surface of the same grade as
+   .ridr-panel, one tier up on --z-detail — below the chrome, above the map
+   panels — and under compact it becomes a bottom sheet.
+
+   Structure:
+     .ridr-card > .ridr-card-head (> .ridr-card-title + .card-close)
+                + .ridr-card-body
+
+   Positioning is the app's job (the kit does not know which corner is free);
+   set inset properties on .ridr-card in app CSS. Under compact, §6 overrides
+   whatever the app chose and docks the card to the bottom edge. */
+.ridr-card {
+  position: absolute;
+  z-index: var(--z-detail);
+  width: min(360px, calc(100vw - 2rem));
+  max-height: min(70dvh, 640px);
+  display: flex; flex-direction: column;
+  background: var(--glass);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.ridr-card-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 0.75rem; padding: 0.75rem 0.75rem 0.5rem;
+  flex-shrink: 0;
+}
+.ridr-card-title {
+  font-size: 0.95rem; font-weight: var(--heading-weight);
+  color: var(--text-primary); line-height: 1.2; margin: 0;
+}
+.ridr-card-body {
+  padding: 0 0.75rem 0.75rem;
+  overflow-y: auto;
+  font-size: 0.85rem; color: var(--text-secondary); line-height: 1.55;
+  /* Momentum scrolling inside the sheet without the page rubber-banding. */
+  overscroll-behavior: contain;
+}
+/* Sized like .modal-close and bumped to 44px on touch (§6) — a card is the
+   surface a phone user dismisses most often, so it gets the AAA target. */
+.card-close {
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--ctrl-border); border-radius: 6px;
+  color: var(--text-muted); font-size: 1.2rem; cursor: pointer; line-height: 1;
+  flex-shrink: 0; min-width: 34px; min-height: 34px;
+  transition: var(--transition);
+}
+.card-close:hover { color: var(--text-primary); border-color: var(--accent-line); background: var(--accent-hover); }
+
+/* Combobox: a search input plus an ARIA listbox of results. NEW in this kit —
+   mco-theme.css deliberately leaves the search field app-owned; NGP RIDR
+   apps all need the same county/producer lookup, so it is standardised here.
+
+   Structure (ARIA 1.2 combobox, listbox popup):
+     <div class="ridr-combobox">
+       <input type="search" role="combobox" aria-expanded="false"
+              aria-controls="results" aria-autocomplete="list">
+       <kbd>/</kbd>
+       <ul id="results" role="listbox"> <li role="option" …> </ul>
+     </div> */
+.ridr-combobox { position: relative; display: flex; align-items: center; gap: 0.4rem; }
+.ridr-combobox input[type="search"],
+.ridr-combobox input[type="text"] {
+  min-height: 34px;
+  padding: 0.35rem 0.6rem;
+  background: var(--input-bg);
+  border: 1px solid var(--ctrl-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: inherit; font-size: 0.8rem;
+  transition: var(--transition);
+}
+.ridr-combobox input::placeholder { color: var(--text-dim); opacity: 1; }
+.ridr-combobox input:hover { border-color: var(--accent-line); }
+/* "Press /" hint chip. A physical-keyboard affordance — §5's search collapse
+   hides it in the compact overlay, where it would sit over the typed text. */
+.ridr-combobox kbd {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+/* The dropdown sits on the opaque --bg-surface, NOT --glass: results are text
+   over whatever the map happens to show, and blur cannot guarantee a ratio. */
+.ridr-combobox [role="listbox"] {
+  position: absolute;
+  top: calc(100% + 4px); left: 0; right: 0;
+  z-index: var(--z-flyout);
+  margin: 0; padding: 0.25rem; list-style: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  max-height: min(320px, 50dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ridr-combobox [role="option"] {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem; color: var(--text-secondary);
+  cursor: pointer;
+}
+.ridr-combobox [role="option"] .option-sub {
+  font-family: var(--font-mono); font-size: 0.68rem;
+  color: var(--text-muted); flex-shrink: 0;
+}
+/* Selectable rows only: the zero-results and overflow rows are options with
+   aria-disabled="true" (ui/search.js), and a hover highlight on a row that
+   cannot be picked is a lie. */
+.ridr-combobox [role="option"]:not([aria-disabled="true"]):hover { background: var(--accent-hover); color: var(--text-primary); }
+/* In the ARIA combobox pattern aria-selected marks the ACTIVE option that the
+   arrow keys have moved to (the input keeps DOM focus, so :focus-visible never
+   fires here). It must be distinguishable from a mere hover and must not rely
+   on color alone: the inset bar and the weight change carry it for CVD users
+   and in forced-colors mode. */
+.ridr-combobox [role="option"][aria-selected="true"] {
+  background: var(--accent-hover);
+  color: var(--text-primary);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 0 var(--accent-line);
+}
+.ridr-combobox [role="option"][aria-disabled="true"] { color: var(--text-dim); cursor: not-allowed; }
+/* Zero-results row (.option-empty) and the counted overflow row (.option-more):
+   text, never an empty box. Both are disabled OPTIONS — a listbox whose only
+   child is a presentation row has no options at all, which is an axe-critical
+   aria-required-children failure. --text-muted, not the --text-dim above:
+   these rows carry the only answer the reader gets. */
+.ridr-combobox [role="listbox"] .option-empty {
+  padding: 0.5rem; font-size: 0.8rem; color: var(--text-muted); font-style: italic;
+}
+
+/* Collapsible search ─────────────────────────────────────────────────────────
+   At compact widths a navbar search field costs more width than it earns, but
+   hiding it strands the only keyboard route to a named feature. Instead it
+   collapses into a disclosure button grouped with the other nav buttons and
+   expands as a full-width overlay bar under the navbar.
+
+   The breakpoint is the ladder's existing 640px compact edge rather than a
+   fifth number: compact is exactly where an inline field stops paying for
+   itself. Deliberately width-only — unlike the compact MQ in §6 it has no
+   max-height clause, because a short landscape window is still wide enough for
+   an inline field.
+
+   Add .ridr-search-collapse to the search wrapper and .ridr-search-toggle to
+   the button:
+     <div class="ridr-combobox ridr-search-collapse" id="search-wrap"> … </div>
+     <button class="nav-btn icon-only ridr-search-toggle"
+             aria-expanded="false" aria-controls="search-wrap"> … </button>
+   Inner selectors are generic on purpose (input[type=search], kbd), so this
+   works whatever the app calls its own parts. */
+.ridr-search-toggle { display: none; }
+@media (max-width: 640px) {
+  .ridr-search-toggle { display: flex; }
+  .ridr-navbar .ridr-search-collapse { display: none; }
+  .ridr-navbar .ridr-search-collapse.is-open {
+    display: flex;
+    /* .ridr-navbar is the positioned ancestor, so top:100% lands the bar
+       directly beneath the whole (possibly wrapped) navbar. */
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    z-index: var(--z-flyout);
+    padding: 0.5rem max(0.75rem, env(safe-area-inset-right))
+             0.5rem max(0.75rem, env(safe-area-inset-left));
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  /* Fill the bar — flex-basis beats the field's own fixed and :focus widths. */
+  .ridr-navbar .ridr-search-collapse.is-open input[type="search"],
+  .ridr-navbar .ridr-search-collapse.is-open input[type="search"]:focus {
+    flex: 1 1 0; width: auto;
+  }
+  /* A "press /" hint is a physical-keyboard affordance; in the overlay it would
+     sit on top of the text being typed. */
+  .ridr-navbar .ridr-search-collapse.is-open kbd { display: none; }
+}
+
+/* Control drawer ─────────────────────────────────────────────────────────────
+   Two surfaces, one element. On desktop the drawer is a REAL COLUMN of the
+   app's map row: closing it hands its width to the map, which is the one camera
+   change the reader actually asked for (a floating panel would cover the map it
+   is filtering). Under compact (§6) the same element becomes an off-canvas
+   overlay over the map with a scrim behind it, because a 272px fixture on a
+   phone leaves no map at all.
+
+   Behavior is ui/drawer.js; `.is-closed` is the single state class, and that
+   module syncs aria-expanded and aria-label on the toggles in the same breath it
+   flips the class, so the accessible state cannot drift from the geometry.
+
+   Structure. The tab is the drawer's NEXT SIBLING, and the scrim and the map
+   pane are siblings too — all inside one positioned flex row that the APP owns
+   (the kit does not know how many panes that row has):
+
+     <main>                            <!-- display:flex; position:relative -->
+       <aside id="drawer" class="ridr-drawer" aria-label="Map controls">
+         <div class="ridr-drawer-scroll">
+           <section class="ridr-drawer-section">
+             <h2 class="ridr-drawer-title">Program year</h2>
+             …
+       <button id="drawer-tab" class="ridr-drawer-tab" aria-expanded="true"
+               aria-controls="drawer" aria-label="Hide controls"> … </button>
+       <div id="drawer-scrim" class="ridr-drawer-scrim" hidden aria-hidden="true"></div>
+       <div id="map-frame">              <!-- flex: 1 1 auto; min-width: 0 -->
+
+   NEW in this kit. mco-theme.css ships no drawer; the pattern is ported from
+   mt-climate-office/mesonet-explorer, which hand-rolls it per app — see
+   ui/drawer.js § Attribution for the deltas. */
+.ridr-drawer {
+  flex: 0 0 var(--drawer-w);
+  width: var(--drawer-w);
+  display: flex; flex-direction: column;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  padding-left: env(safe-area-inset-left);
+  transition: margin-left var(--transition);
+}
+/* Closed: slide the column out of the row so the map claims the space — and
+   take the drawer out of the TAB ORDER with it. `visibility` is animatable but
+   interpolates DISCRETELY, holding `visible` for the whole transition, so the
+   drawer stays on screen while it slides and only leaves the accessibility tree
+   once it is gone: no JS, no [hidden] bookkeeping, and no keyboard user tabbing
+   through a control set they cannot see (the defect this fixes in the ported
+   original). ui/drawer.js moves focus out BEFORE that lands.
+
+   THE VISIBILITY TRANSITION IS DECLARED ONLY HERE, on the closed state, and
+   that asymmetry is the whole trick: transition-property is read from the
+   AFTER-change style, so CLOSING (adding .is-closed) delays the hide until the
+   slide is over, while OPENING (removing it) has no visibility transition at
+   all and the drawer is visible — and focusable — in the very style pass that
+   ui/drawer.js's focus() call forces. Transition it in both directions and the
+   drawer computes as `hidden` for one more frame after opening, which silently
+   drops that focus() and strands a compact reader's cursor under the scrim. */
+.ridr-drawer.is-closed {
+  margin-left: calc(-1 * var(--drawer-w));
+  visibility: hidden;
+  transition: margin-left var(--transition), visibility var(--transition);
+}
+/* The scrolling body. min-height:0 is what lets a flex child actually scroll
+   instead of growing, and overscroll-behavior stops the page rubber-banding
+   when the list hits its end. Every drawer holds real controls, so this
+   scrollable region always has a keyboard route into it (axe:
+   scrollable-region-focusable) — an empty drawer would not. */
+.ridr-drawer-scroll {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: 10px 12px 16px;
+}
+.ridr-drawer-section { padding: 8px 0; border-bottom: 1px solid var(--border-glass); }
+.ridr-drawer-section:last-child { border-bottom: 0; }
+/* Section eyebrow, the same grade as .ridr-panel-title (--ochre-dark, 4.91:1 on
+   cream / 5.25:1 on white): a drawer usually replaces a stack of floating
+   panels, and its headings have to read as the same rank they did. */
+.ridr-drawer-title {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ochre-dark);
+  margin: 0 0 0.4rem;
+}
+/* Kit controls were drawn for a horizontal navbar; in a 272px column they go
+   full width. The label takes a row of its own and the slider shares the next
+   one with its output — and `min-width: 0` is load-bearing, because
+   input[type=range] ships a 7rem minimum that would otherwise push the output
+   out of the column. */
+.ridr-drawer .ridr-range { flex-wrap: wrap; width: 100%; }
+.ridr-drawer .ridr-range > .control-label { flex: 1 1 100%; }
+.ridr-drawer .ridr-range > input[type="range"] { flex: 1 1 0; min-width: 0; }
+.ridr-drawer input[type="range"] { width: 100%; }
+.ridr-drawer .seg-btns { width: 100%; }
+.ridr-drawer .seg-btn { flex: 1; justify-content: center; }
+.ridr-drawer .ridr-combobox { width: 100%; }
+.ridr-drawer .ridr-combobox input[type="search"],
+.ridr-drawer .ridr-combobox input[type="search"]:focus,
+.ridr-drawer .ridr-combobox input[type="text"] { flex: 1 1 0; width: 100%; min-width: 0; }
+
+/* The edge tab: the desktop collapse handle, vertically centred so it never
+   shares a corner with the map's own controls. 18px wide because it is chrome
+   on the map's edge rather than a button in a bar (24px under hover:none, §6).
+
+   SIBLING CONTRACT — the tab MUST be the drawer's next sibling in the DOM. Both
+   its resting position and its chevron direction are selected through
+   `.ridr-drawer.is-closed + .ridr-drawer-tab`, and CSS has no parent or
+   previous-sibling selector to fall back on: wrapping either element in a div
+   silently breaks both halves of the affordance. */
+.ridr-drawer-tab {
+  position: absolute; z-index: var(--z-map-panel);
+  top: 50%; margin-top: -22px;
+  left: var(--drawer-w);
+  width: 18px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  background: var(--bg-surface); color: var(--text-secondary);
+  /* --ctrl-border, not the decorative --border hairline: this is an interactive
+     edge and owes 3:1 (WCAG 1.4.11). No left border — the tab reads as an
+     extension of the drawer's own edge, and as the map's when closed. */
+  border: 1px solid var(--ctrl-border); border-left: 0;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  cursor: pointer; font-family: inherit;
+  box-shadow: var(--shadow);
+  transition: left var(--transition), background var(--transition), color var(--transition);
+}
+.ridr-drawer-tab:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-line);
+  color: var(--text-primary);
+}
+/* The chevron shows the ACTION, not the state — same idiom as
+   .ridr-panel-toggle. The markup glyph points LEFT ("collapse"); closed, it
+   rotates to point right ("expand"). */
+.ridr-drawer-tab svg { width: 12px; height: 12px; transition: transform var(--transition); }
+.ridr-drawer.is-closed + .ridr-drawer-tab { left: 0; }
+.ridr-drawer.is-closed + .ridr-drawer-tab svg { transform: rotate(180deg); }
+
+/* The navbar hamburger. Compact-only, exactly like .ridr-search-toggle: §6
+   shows it, and on desktop the edge tab is the handle instead. */
+.ridr-drawer-toggle { display: none; }
+
+/* The drawer's own scrim. Deliberately NOT .ridr-scrim: that one is
+   viewport-fixed and would dim the navbar as well. This one is ABSOLUTE inside
+   the app's positioned map row, so an open drawer dims the map — and an open
+   bottom sheet at --z-detail — while the chrome above it stays live. That is
+   the right call for a drawer: the theme toggle and the help button are up
+   there, and a control drawer is not a modal. Display comes on in §6; the kit's
+   [hidden] rule still outranks it, so `scrim.hidden = true` works. */
+.ridr-drawer-scrim {
+  display: none;
+  position: absolute; inset: 0;
+  z-index: var(--z-drawer-scrim);
+  background: var(--scrim);
+}
+
+/* The page-level scrim: viewport-fixed, at the panel tier. For anything that
+   has to dim the whole window (a full-screen overlay bar, an app's own
+   off-canvas surface). A drawer built from .ridr-drawer uses
+   .ridr-drawer-scrim above instead — it dims the map, not the chrome. */
+.ridr-scrim {
+  position: fixed; inset: 0;
+  background: var(--scrim);
+  z-index: var(--z-map-panel);
+}
+
+/* ── 6. Responsive & touch ────────────────────────────────────────────────
+   Breakpoint ladder, ported from mco-web-style HOUSE-STYLE.md §3:
+     1400  shed button/control text labels
+     1060  tighten chrome gaps
+      750  collapse the brand lockup (wide banner → square badge)
+      640  shed .refresh-status, collapse search; COMPACT begins
+
+   "Compact" also has a height variant. The string is, verbatim:
+
+       (max-width: 640px), (max-height: 560px)
+
+   A short landscape phone is compact too. KEEP IN SYNC with
+   viewport.COMPACT_MQ in core/core.js — that constant and this comment are the
+   only two places the string is authored, and the compact @media block at the
+   bottom of this file must match it character for character.
+
+   Layout lives in real @media rules (no flash before deferred JS runs);
+   behavior decisions (sheet vs anchored card, auto-collapse) key off the JS
+   viewport helper. */
+@media (max-width: 1400px) {
+  /* DELTA vs mco-theme.css: MCO display:none's .btn-label and only clips
+     .control-label. Here BOTH use the clip pattern. A .btn-label is often the
+     only accessible name a consumer remembered to give its button, and
+     display:none removes it from the accessibility tree — the button then goes
+     nameless at every width below 1400px (axe: button-name). Clipping keeps
+     the name and costs nothing. Buttons should STILL carry a permanent
+     aria-label; this is the belt to that suspenders. */
+  .ridr-navbar .btn-label,
+  .ridr-navbar .control-label {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0);
+    white-space: nowrap; border: 0;
+  }
+  /* Once the label is out of flow, the icon is left sitting in label-sized
+     padding (6px 12px) — visibly wider than the .icon-only buttons next to it
+     in the same bar. Square it up so a mixed row of labelled and icon-only
+     buttons reads as one set. .ridr-btn-info is untouched: its circle is a
+     deliberate distinction, and it never carries a .btn-label. */
+  .ridr-navbar .nav-btn:has(> .btn-label) {
+    padding: 0.4rem; min-width: 34px; justify-content: center;
+  }
+}
+@media (max-width: 1060px) {
+  /* Tighten via the custom property, never `gap` directly — the lockup
+     divider's margin is derived from it. */
+  .ridr-navbar { padding-right: 0.6rem; --nav-gap: 0.5rem; }
+  .nav-meta { gap: 0.3rem; }
+}
+/* Brand lockup collapse. The wide banner (1225×350 → 140px at 40px tall) is
+   most of the bar on a phone, so it swaps for the square badge — a pure CSS
+   toggle between two sibling <img>s in .logo-link, no JS and no reflow.
+
+   The text lockup is VISUALLY hidden rather than display:none'd on purpose:
+   .brand-title is often the page's <h1>, and a document outline shouldn't
+   disappear at a breakpoint. Screen readers still get the app name; sighted
+   users get the badge.
+
+   Consumers that keep the full lockup at every width must restore BOTH the
+   .brand static position and the divider. */
+@media (max-width: 750px) {
+  .logo-link > img.banner-img { display: none; }
+  .logo-link > img.badge-img  { display: block; }
+  .brand {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0);
+    white-space: nowrap; border: 0;
+  }
+  .ridr-navbar > .nav-divider { display: none; }
+}
+@media (max-width: 640px) {
+  .refresh-status { display: none; }   /* reclaim space on phones */
+}
+
+/* COMPACT — the string below must match the §6 header comment and
+   viewport.COMPACT_MQ in core/core.js exactly. */
+@media (max-width: 640px), (max-height: 560px) {
+  /* The detail card becomes a bottom sheet: docked to the bottom edge, rounded
+     on top only, capped at 45dvh so the map stays the larger half of the
+     screen. Whatever inset the app set for the floating card is overridden
+     here — that is the point of the override.
+
+     While the sheet is open, JS must stamp its rendered height on :root as
+     --sheet-h (including the safe-area padding). The bottom MapLibre corner
+     controls (§4) and the toast (§5) both lift by that amount; nothing else
+     needs to know the sheet exists. Clear it (or set 0px) on close. */
+  .ridr-card {
+    position: fixed;
+    top: auto; left: 0; right: 0; bottom: 0;
+    width: auto; max-width: none;
+    max-height: 45dvh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-left: none; border-right: none; border-bottom: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* The drawer stops being a column of the row and becomes an off-canvas
+     overlay OVER the map: a 272px fixture on a phone would leave no map to
+     control. It slides on `transform` here rather than `margin-left`, because
+     there is no longer a column to hand back — but it keeps the base rule's
+     `visibility` transition, so a closed drawer is still out of the tab order.
+
+     ui/drawer.js force-closes the drawer on the way into compact and does NOT
+     persist that: an overlay inherited from a desktop "open" preference would
+     cover the map with a panel nobody asked for, and a phone visit must not
+     rewrite the desktop preference. */
+  .ridr-drawer {
+    position: absolute; z-index: var(--z-drawer);
+    top: 0; bottom: 0; left: 0;
+    flex: none;
+    width: min(300px, 86vw);
+    margin-left: 0;
+    box-shadow: var(--shadow);
+    transform: translateX(0);
+    transition: transform var(--transition);
+  }
+  /* Same one-directional visibility contract as the desktop rule above — the
+     hide waits for the slide, the show does not wait for anything. */
+  .ridr-drawer.is-closed {
+    transform: translateX(-100%);
+    margin-left: 0;
+    transition: transform var(--transition), visibility var(--transition);
+  }
+  /* The edge tab would be a second, redundant control beside the hamburger —
+     and there is no column edge left for it to hang on. */
+  .ridr-drawer-tab { display: none; }
+  .ridr-drawer-toggle { display: flex; }
+  .ridr-drawer-scrim { display: block; }
+}
+
+/* NOT-COMPACT — the complement of the block above, and the ONE place in this
+   file where those two numbers are authored a second time. 641 = 640 + 1 and
+   561 = 560 + 1, so KEEP THEM IN LOCKSTEP with the compact block: a
+   comma-separated media list has no single-query negation (`not all and
+   (max-width: 640px), (max-height: 560px)` negates only the first arm), which
+   is why the numbers are repeated rather than inverted. This is deliberately a
+   DIFFERENT string from the compact query, so it does not disturb the
+   occurrence count tools/check-tokens.mjs makes of that one.
+
+   `.ridr-card.dock-right` docks the detail surface against the right edge of the
+   map at full height instead of floating in a corner — the right call for an app
+   whose card carries a long readout, where a 70dvh box that scrolls inside a box
+   is worse than a column. Opt in per app (`class="ridr-card dock-right"`); the
+   plain floating card is untouched, and under compact this variant simply does
+   not apply, so the bottom sheet above is still what a phone gets. */
+@media (min-width: 641px) and (min-height: 561px) {
+  .ridr-card.dock-right {
+    top: 0; right: 0; bottom: 0; left: auto;
+    width: min(360px, 34vw);
+    max-height: none;
+    border-radius: 0;
+    /* Opaque --bg-surface, not --glass: a full-height dock is a page region
+       carrying a table of numbers, and a blur cannot guarantee a ratio for
+       text over whatever the map happens to show. */
+    border: 0; border-left: 1px solid var(--border);
+    background: var(--bg-surface);
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    box-shadow: var(--shadow);
+    /* ENTER-ONLY slide, on purpose: an animation re-runs whenever an element
+       goes from display:none to displayed, which is exactly what ui/card.js
+       does when it flips [hidden] off. So the dock slides in on every open with
+       ZERO changes to that module, and nothing has to animate on the way out.
+       The reduced-motion blanket in §3 clamps it. */
+    animation: ridr-dock-in var(--transition);
+  }
+}
+@keyframes ridr-dock-in {
+  from { transform: translateX(100%); }
+  to   { transform: none; }
+}
+
+/* WCAG 2.5.5 — comfortable touch targets on touch-only devices. */
+@media (hover: none) {
+  .nav-btn, .seg-btn { min-height: 40px; }
+  /* The :has() arm covers label-shed buttons squared by §6; above 1400px the
+     label makes them wider than 40px anyway, so it's a no-op there. */
+  .nav-btn.icon-only, .ridr-navbar .nav-btn:has(> .btn-label) { min-width: 40px; }
+  .ridr-btn-info { width: 40px; height: 40px; }
+  /* Dismiss controls get the AAA 44px target. */
+  .modal-close, .card-close { min-width: 44px; min-height: 44px; }
+  .ridr-panel-toggle { width: 36px; height: 36px; }
+  /* The edge tab is already 44px tall; widen it toward the 2.5.5 target. It only
+     shows on non-compact viewports, which a touch device can still be (a
+     tablet), so this is not dead weight. */
+  .ridr-drawer-tab { width: 24px; }
+  .ridr-combobox input[type="search"],
+  .ridr-combobox input[type="text"] { min-height: 40px; }
+  .ridr-combobox [role="option"] { min-height: 44px; align-items: center; }
+  /* The slider's own box IS its hit area — grow it to 40px and scale the thumb
+     with it. margin-top re-centres the enlarged WebKit thumb on the 4px track. */
+  input[type="range"] { height: 40px; }
+  input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -10px; }
+  input[type="range"]::-moz-range-thumb     { width: 24px; height: 24px; }
+}

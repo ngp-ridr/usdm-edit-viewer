@@ -1,0 +1,19 @@
+<!-- sustainable-fsa/style · skip link (WCAG 2.4.1 Bypass Blocks)
+
+     Paste as the FIRST element inside <body> — before the navbar, so it is the
+     first thing a keyboard user reaches. Point href at your main content
+     container and give that container BOTH id="main" and tabindex="-1", or
+     focus will not actually move there (the browser scrolls but leaves focus
+     in the link, and the next Tab drops the user back into the chrome):
+
+       <main id="main" tabindex="-1"> … </main>
+
+     "Skip to map" is the house wording for a map app, because the map IS the
+     content. Use "Skip to main content" on a page whose body is prose, and
+     keep the target id the same either way.
+
+     Styling comes from .ridr-skip-link in theme/ridr-theme.css: parked off the
+     top edge until keyboard-focused, then pinned top-left above all chrome
+     (z-index one tier above the toast). It is never display:none — a hidden
+     skip link is not focusable and does not satisfy 2.4.1. -->
+<a class="ridr-skip-link" href="#main">Skip to map</a>

@@ -1,0 +1,75 @@
+<!-- ==========================================================================
+     snippets/head.html — the <head> template for THIS repo.
+
+     Upstream's version pins every kit URL to an absolute versioned origin,
+     because the kit is served separately from its consumers there. This fork is
+     VENDORED: the kit lives inside the app at vendor/style/, so every path below
+     is app-root-relative and the CSP needs nothing but 'self' for kit assets.
+
+     Deltas from upstream, both deliberate:
+       · NO font preload and no @font-face — NGP RIDR ships the system stack.
+         See theme/ridr-theme.css § 0.
+       · Paths are relative, not pinned-absolute. There is no version to bump;
+         the fork moves with the app.
+     ========================================================================== -->
+
+<meta charset="UTF-8">
+<!-- viewport-fit=cover makes env(safe-area-inset-*) live on notched phones.
+     Without it every safe-area padding in ridr-theme.css silently resolves to 0. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+<!-- Content-Security-Policy. Shipped as <meta> because GitHub Pages serves no
+     custom headers — which is also why frame-ancestors is absent (ignored in
+     meta form).
+
+     connect-src carries the app's two runtime data origins, both CORS-open:
+       · data.sustainable-fsa.com — the USDM GeoParquet archive + its manifest
+       · sustainable-fsa.com      — the FSA county/state boundary TopoJSON
+     worker-src blob: is required by MapLibre GL, which starts tile workers from
+     blob URLs. The sha256 is the hash of THIS page's anti-flash script. -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self' 'sha256-REPLACE-ME';
+  worker-src blob:;
+  style-src 'self';
+  font-src 'self';
+  img-src 'self' data: blob:;
+  connect-src 'self' https://data.sustainable-fsa.com https://sustainable-fsa.com;
+  manifest-src 'self';
+  base-uri 'none';
+  form-action 'none';
+">
+
+<!-- Anti-flash theme boot: INLINE and FIRST, above every stylesheet. From a
+     file it would run after first paint and reintroduce the flash it exists to
+     prevent. Body is snippets/anti-flash.html; the CSP hash above is of THIS
+     page's bytes, so re-hash after changing so much as a space. The failure is
+     quiet — the theme still renders, the flash just comes back. -->
+<script>/* … snippets/anti-flash.html … */</script>
+
+<!-- Favicons / app icons — this app's own, in brand/. -->
+<link rel="icon" href="brand/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="brand/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="brand/apple-touch-icon.png">
+<link rel="manifest" href="brand/site.webmanifest">
+
+<!-- MapLibre GL — vendored; the version is in the path. -->
+<link rel="stylesheet" href="vendor/maplibre-gl-5.18.0/maplibre-gl.css">
+
+<!-- NGP RIDR house style. Loads AFTER the vendor sheet so its MapLibre control
+     polish wins without !important on every declaration. -->
+<link rel="stylesheet" href="vendor/style/theme/ridr-theme.css">
+
+<!-- App layout only. Never component styling — that is the kit's job. -->
+<link rel="stylesheet" href="css/app.css">
+
+<!-- ==========================================================================
+     Script tags go near the END of <body>, in this order:
+       1. vendor/maplibre-gl-5.18.0/maplibre-gl.js   (classic → window.maplibregl)
+       2. vendor/turf-7.4.0/turf.min.js              (classic → window.turf)
+       3. vendor/topojson-client-3.1.0/…             (classic → window.topojson)
+       4. <script type="module" src="js/app.js">     (runs last, by definition)
+     An import map for the bare "terra-draw" specifier must appear in <head>,
+     BEFORE any module script — see index.html.
+     ========================================================================== -->

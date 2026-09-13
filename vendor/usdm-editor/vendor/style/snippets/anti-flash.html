@@ -1,0 +1,50 @@
+<!-- sustainable-fsa/style · anti-flash theme boot
+
+     KEEP THIS INLINE in your <head>, ABOVE every <link rel="stylesheet">.
+     Loading it from a URL — even from sustainable-fsa.com — would defer it
+     past first paint and reintroduce the flash of the wrong theme it exists to
+     prevent. This snippet is copy-paste by design, not a shared file.
+
+     Precedence: ?theme= URL param → localStorage['ridr-theme'] → OS
+     preference (prefers-contrast: more). Both stored and URL values are
+     validated against a whitelist: the theme attribute is shared by every
+     NGP RIDR app on the origin, so never write an unvalidated string
+     into the DOM. Anything unrecognised falls through to 'light', which is the
+     kit's default theme (bare :root in theme/ridr-theme.css) — so even a total
+     script failure renders correctly.
+
+     Note there is no dark theme: NGP RIDR is light-first. The OS signal
+     we honor is prefers-contrast, not prefers-color-scheme.
+
+     CSP — READ THIS BEFORE EDITING. If your page ships a Content-Security-
+     Policy (snippets/head.html does), script-src must carry the sha256 of
+     EXACTLY the bytes between <script> and </script> below, whitespace and
+     newlines included. Change one character here and the hash changes and the
+     script is blocked — the flash comes back and the page still works, which
+     makes this a quiet failure. Recompute after ANY edit:
+
+       python3 -c "import base64,hashlib;s=open('snippets/anti-flash.html').read();b=s.rsplit('<script>',1)[1].rsplit('</script>',1)[0];print('sha256-'+base64.b64encode(hashlib.sha256(b.encode()).digest()).decode())"
+
+     It rsplits rather than searching forward because this very comment
+     contains the tag names — a greedy /<script>(.*)<\/script>/ would swallow
+     the recipe line and hash the wrong bytes. The rsplit lands on the LAST
+     pair in the file, which is the real script.
+
+     The hash is PER CONSUMER PAGE: if you reformat this block when pasting it
+     (an editor re-indent is enough), rerun the recipe against your own page —
+     and if your page has other <script> tags after this one, extract the body
+     yourself instead of trusting the rsplit. -->
+<script>
+  (function () {
+    var valid = ['light', 'high-contrast'];
+    var raw = new URLSearchParams(location.search).get('theme');
+    var url = raw == null ? null : raw.toLowerCase();
+    var saved = null;
+    try { saved = localStorage.getItem('ridr-theme'); } catch (e) {}
+    var moreContrast = window.matchMedia('(prefers-contrast: more)').matches;
+    var t = valid.indexOf(url) > -1 ? url
+          : valid.indexOf(saved) > -1 ? saved
+          : (moreContrast ? 'high-contrast' : 'light');
+    document.documentElement.dataset.theme = t;
+  })();
+</script>

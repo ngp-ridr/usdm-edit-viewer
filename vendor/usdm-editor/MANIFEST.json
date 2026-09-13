@@ -1,0 +1,243 @@
+{
+  "source": "https://github.com/ngp-ridr/usdm-editor",
+  "sourcePath": "../usdm-editor",
+  "commit": "081120fb77f861549be972b3fbb7f98f96ea838f",
+  "commitSubject": "The proposal downloads as .json.gz, not .zip — same bytes, a name that says what it holds, no container code of ours",
+  "dirty": false,
+  "syncedAt": "2026-09-13T04:37:16.548Z",
+  "count": 58,
+  "files": {
+    "vendor/aoi/PROVENANCE.md": {
+      "from": "vendor/aoi/PROVENANCE.md",
+      "sha256": "477947477f7bc59389c7666eacd0d43459d3ffe3da0a4685bdade83c4e7ea689"
+    },
+    "vendor/aoi/aiannh.json": {
+      "from": "vendor/aoi/aiannh.json",
+      "sha256": "6fb7e017adac3f7a64612d6721577c36c5a494d503e3369d92e7d29ef27c2e19"
+    },
+    "vendor/aoi/neighbors.json": {
+      "from": "vendor/aoi/neighbors.json",
+      "sha256": "abe0bf3f3643d39d8875c915fb3a082725d302367d991311dc28effda769efdd"
+    },
+    "vendor/aoi/states.json": {
+      "from": "vendor/aoi/states.json",
+      "sha256": "1fc40a3df8260b54eeaa2d31b2176561dd7b6f2e173a432cfb85e2a4826b5ff2"
+    },
+    "vendor/usdm-editor/js/aoi.js": {
+      "from": "js/aoi.js",
+      "sha256": "bb097ab1738eb98b7ce859933fb6ad35edb0d8999e801beaa8661d67e854dc03"
+    },
+    "vendor/usdm-editor/js/aois.js": {
+      "from": "js/aois.js",
+      "sha256": "43721ece7337c53f875ec180f0ebdf6c3e4168d471841c756f6d5554cb6ed280"
+    },
+    "vendor/usdm-editor/js/archive.js": {
+      "from": "js/archive.js",
+      "sha256": "d8878a79d384273a0f968fcc85f700ff09ea8aac3b0768fde2a43a7a6f552a06"
+    },
+    "vendor/usdm-editor/js/basemap.js": {
+      "from": "js/basemap.js",
+      "sha256": "bc4552445c43d0c79762f7d833f053995ca40bc61cc0af5fd7aa9f7816abc6ea"
+    },
+    "vendor/usdm-editor/js/changes.js": {
+      "from": "js/changes.js",
+      "sha256": "da3632a6e406e2a6f6cc988a34a4f0460fb78434e4e1b9d3ee7babe964d462ad"
+    },
+    "vendor/usdm-editor/js/changeset.js": {
+      "from": "js/changeset.js",
+      "sha256": "3b89b0cee7a3fc57f456b969148d5718d474a0866ba7b27de1e5ca2bd0614a19"
+    },
+    "vendor/usdm-editor/js/color.js": {
+      "from": "js/color.js",
+      "sha256": "10cf49471c801f6782e933869e5daf585299894ea64f54062fbbf5f530d372b2"
+    },
+    "vendor/usdm-editor/js/delta.js": {
+      "from": "js/delta.js",
+      "sha256": "e25963ce5e12db39dd1fc794bf4bbe86ea93da26a8475c3a19c7c42a263ff46a"
+    },
+    "vendor/usdm-editor/js/dom.js": {
+      "from": "js/dom.js",
+      "sha256": "221f74bb10be038b66eaf05347043988be979859e3c548baceec4fe44e3e50d6"
+    },
+    "vendor/usdm-editor/js/geojson.js": {
+      "from": "js/geojson.js",
+      "sha256": "0798f5201d283f987e609595b818ea2b781315b16aa905e91a1b68251584bc47"
+    },
+    "vendor/usdm-editor/js/gzip.js": {
+      "from": "js/gzip.js",
+      "sha256": "149306da1b472c7f68f3186e8e90566a7e068e5d97641bd32605e7958c4d3a30"
+    },
+    "vendor/usdm-editor/js/heuristic.js": {
+      "from": "js/heuristic.js",
+      "sha256": "e050d7c6f84575b9cb2f7f7184103f6e90e2fd56e14b1522f45971c4c84d4837"
+    },
+    "vendor/usdm-editor/js/image.js": {
+      "from": "js/image.js",
+      "sha256": "b15f9d0525c455524fc995ad6f9aba714fc8b9f5d00dec56726fb7325837114d"
+    },
+    "vendor/usdm-editor/js/justify.js": {
+      "from": "js/justify.js",
+      "sha256": "cd0a1426fd35cda76dd14dc20e7be2056ab08c487db14dd0e3af4b90cc34303f"
+    },
+    "vendor/usdm-editor/js/layers.js": {
+      "from": "js/layers.js",
+      "sha256": "2fd9b6637e9bcced54188779e438e7702d3a63237c0e200c8fc3bf28433e48cd"
+    },
+    "vendor/usdm-editor/js/mdtext.js": {
+      "from": "js/mdtext.js",
+      "sha256": "6ccf6004d8ffdeede2bd79b430f21f390a4bac7db5e914b96c21aa86a41ff652"
+    },
+    "vendor/usdm-editor/js/submit.js": {
+      "from": "js/submit.js",
+      "sha256": "5155bccf07934b489540ac6c020c542d450f6fe0d30725ad04d4d4189fd9df4f"
+    },
+    "vendor/usdm-editor/js/topology.js": {
+      "from": "js/topology.js",
+      "sha256": "186e8376d6c086c23e56443f37d46447614d655c3f7c6a66d56dbed7224cc56b"
+    },
+    "vendor/usdm-editor/js/units.js": {
+      "from": "js/units.js",
+      "sha256": "705ab1e52d0e55bf9b1810d83db205755272ec45ab2c9761a2c679cca3e78493"
+    },
+    "vendor/usdm-editor/vendor/VENDORED.md": {
+      "from": "vendor/VENDORED.md",
+      "sha256": "83d1afaa6d0e7759461f1f09a786829e2c6e09661c28a9c61a6466f52c9f8d6e"
+    },
+    "vendor/usdm-editor/vendor/fzstd-0.1.1/LICENSE": {
+      "from": "vendor/fzstd-0.1.1/LICENSE",
+      "sha256": "62249119bb7df6e54300f37a37145c26a6d4420410aac8881a119c5b427cf751"
+    },
+    "vendor/usdm-editor/vendor/fzstd-0.1.1/fzstd.esm.js": {
+      "from": "vendor/fzstd-0.1.1/fzstd.esm.js",
+      "sha256": "21add2d34e89a9b47179cea75c77c0c6ce9e9de53bc48b2e56dc5f7cfd49c1ab"
+    },
+    "vendor/usdm-editor/vendor/hyparquet-1.28.2/LICENSE": {
+      "from": "vendor/hyparquet-1.28.2/LICENSE",
+      "sha256": "6e19a315e03f36020f37dedcb1dd93b4eba6ebfd94ccdd13ec55b940776fb55e"
+    },
+    "vendor/usdm-editor/vendor/hyparquet-1.28.2/hyparquet.esm.js": {
+      "from": "vendor/hyparquet-1.28.2/hyparquet.esm.js",
+      "sha256": "bebdeb5376faf031606706ce803005f6462f0cc40f1cadf53f999dc804e07c30"
+    },
+    "vendor/usdm-editor/vendor/maplibre-gl-5.18.0/LICENSE": {
+      "from": "vendor/maplibre-gl-5.18.0/LICENSE",
+      "sha256": "ee5fc05a0677eaf69601d2c7db0d9ecd6cc27c3abc1d0733bc9ed34707cf8ef2"
+    },
+    "vendor/usdm-editor/vendor/maplibre-gl-5.18.0/maplibre-gl.css": {
+      "from": "vendor/maplibre-gl-5.18.0/maplibre-gl.css",
+      "sha256": "e4711ce4f6225070a859c7a40dc4d2e4e1ab76a5c71a12b4a65227ed2bf362fd"
+    },
+    "vendor/usdm-editor/vendor/maplibre-gl-5.18.0/maplibre-gl.js": {
+      "from": "vendor/maplibre-gl-5.18.0/maplibre-gl.js",
+      "sha256": "bc7101606a893f9018ac4a0d27f7de07d00fb3852231951fcf3dd900796ddfd7"
+    },
+    "vendor/usdm-editor/vendor/pmtiles-4.5.0/LICENSE": {
+      "from": "vendor/pmtiles-4.5.0/LICENSE",
+      "sha256": "0371c38f338835f7fc13ed71176f3d92144e22c8b736a31cced57adbbeb647b3"
+    },
+    "vendor/usdm-editor/vendor/pmtiles-4.5.0/LICENSE.fflate": {
+      "from": "vendor/pmtiles-4.5.0/LICENSE.fflate",
+      "sha256": "0a1df3a083d0c010560aa342e87959c8c1070e6fd54545741f083f22d0c8b551"
+    },
+    "vendor/usdm-editor/vendor/pmtiles-4.5.0/fflate-0.8.3.esm.js": {
+      "from": "vendor/pmtiles-4.5.0/fflate-0.8.3.esm.js",
+      "sha256": "50daf01c8e6bbda6ffba145ef2a235ea2961a3195eeeec2291fcf2af8cd2f172"
+    },
+    "vendor/usdm-editor/vendor/pmtiles-4.5.0/pmtiles.esm.js": {
+      "from": "vendor/pmtiles-4.5.0/pmtiles.esm.js",
+      "sha256": "65ebe7374021e378e225f79124d8fbf25ea95cfb3f5462020f406e5a380d94a4"
+    },
+    "vendor/usdm-editor/vendor/squire-rte-2.4.8/LICENSE": {
+      "from": "vendor/squire-rte-2.4.8/LICENSE",
+      "sha256": "dfc8ece415ad5f0d71c5d40165465854e087ac3f4e150fa25bd169b4b48cad69"
+    },
+    "vendor/usdm-editor/vendor/squire-rte-2.4.8/squire.mjs": {
+      "from": "vendor/squire-rte-2.4.8/squire.mjs",
+      "sha256": "3132eacfad97dfaa120fa02f46d65d7f8d15e52b7fbe04387d763f20eba90ef2"
+    },
+    "vendor/usdm-editor/vendor/style/LICENSE": {
+      "from": "vendor/style/LICENSE",
+      "sha256": "e4a3ac820cfe2f5070695813871229fc0ecba1f340a583c36e541fe357617e57"
+    },
+    "vendor/usdm-editor/vendor/style/PROVENANCE.md": {
+      "from": "vendor/style/PROVENANCE.md",
+      "sha256": "801fc3eddf3175be8250bfe7f3d49a1fe3f8babe160f0431882f943e36b7134b"
+    },
+    "vendor/usdm-editor/vendor/style/core/core.js": {
+      "from": "vendor/style/core/core.js",
+      "sha256": "51154faf39b3e79b35e810091c05886350eae21cfab9cb31ebe7e5cb513c3b63"
+    },
+    "vendor/usdm-editor/vendor/style/county/county.js": {
+      "from": "vendor/style/county/county.js",
+      "sha256": "2674c2b12b6dc913e10c8a30955e345f5d8679b3fb6ea5f79ef16a2da8874a52"
+    },
+    "vendor/usdm-editor/vendor/style/map/map.js": {
+      "from": "vendor/style/map/map.js",
+      "sha256": "944ba7e54fc5192fb1681fb556ab2e00495d6b93a87031e5c20d8f43f5cad6b8"
+    },
+    "vendor/usdm-editor/vendor/style/snippets/anti-flash.html": {
+      "from": "vendor/style/snippets/anti-flash.html",
+      "sha256": "0815751650fa9a539b830bd0ffa45f1ba0189d8ac0f99921801a1300fceebbab"
+    },
+    "vendor/usdm-editor/vendor/style/snippets/head.html": {
+      "from": "vendor/style/snippets/head.html",
+      "sha256": "69ea4963d90a001771c3e1a4605440181e11da9f5920622d303a404735394691"
+    },
+    "vendor/usdm-editor/vendor/style/snippets/skip-link.html": {
+      "from": "vendor/style/snippets/skip-link.html",
+      "sha256": "1b11cd44c998a5519789537e2a497af1733f64edfb74d6ab6fc2c3fa19d43b36"
+    },
+    "vendor/usdm-editor/vendor/style/theme/ridr-theme.css": {
+      "from": "vendor/style/theme/ridr-theme.css",
+      "sha256": "e88f4b03f1646f9e98bc7ca2a3a232fe99f7337cc20ab83a2cc86919a2f4d903"
+    },
+    "vendor/usdm-editor/vendor/style/ui/card.js": {
+      "from": "vendor/style/ui/card.js",
+      "sha256": "b9e770830df500561ebf7174f52b12ec3cea8b507f5678812e44b9860e9bff24"
+    },
+    "vendor/usdm-editor/vendor/style/ui/drawer.js": {
+      "from": "vendor/style/ui/drawer.js",
+      "sha256": "c5233638f253ff69773a7b590414e94eee0c82b0f3c9165525d8e7607a6d9bf6"
+    },
+    "vendor/usdm-editor/vendor/style/ui/export.js": {
+      "from": "vendor/style/ui/export.js",
+      "sha256": "f1f6271eb4c2ab3b159c176c91811036a7796f8e9e253172a903e419a290a6c2"
+    },
+    "vendor/usdm-editor/vendor/style/ui/help.js": {
+      "from": "vendor/style/ui/help.js",
+      "sha256": "d0039e04276aa60bb8e42dc28da0755a6bd36a0ef795103e40af5985072cfd94"
+    },
+    "vendor/usdm-editor/vendor/style/ui/legend.js": {
+      "from": "vendor/style/ui/legend.js",
+      "sha256": "3815a839dc6e14119d99d0841805b970bf483ddd69d524df269b13f384633489"
+    },
+    "vendor/usdm-editor/vendor/style/ui/search.js": {
+      "from": "vendor/style/ui/search.js",
+      "sha256": "544e97de9a6347bb8ac69a74ce9a22013a18f18b65f9af67039c8c676d4e3591"
+    },
+    "vendor/usdm-editor/vendor/style/vendor-esm/marked-18.0.10/LICENSE": {
+      "from": "vendor/style/vendor-esm/marked-18.0.10/LICENSE",
+      "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c"
+    },
+    "vendor/usdm-editor/vendor/style/vendor-esm/marked-18.0.10/marked.esm.js": {
+      "from": "vendor/style/vendor-esm/marked-18.0.10/marked.esm.js",
+      "sha256": "4cf47dfebb7f614a08fc0a579ab0fe407ff0ed2b717bf953040c85b2f493a4f0"
+    },
+    "vendor/usdm-editor/vendor/topojson-client-3.1.0/LICENSE": {
+      "from": "vendor/topojson-client-3.1.0/LICENSE",
+      "sha256": "4c4d15b635e04e691825a76db7d33f7f2033b55669a7430011694f31e6c65999"
+    },
+    "vendor/usdm-editor/vendor/topojson-client-3.1.0/topojson-client.min.js": {
+      "from": "vendor/topojson-client-3.1.0/topojson-client.min.js",
+      "sha256": "25cd02ae486cc5063e0215a4e4cfb15de83700c87ac48bac4d57dc6aaf3ebb89"
+    },
+    "vendor/usdm-editor/vendor/turf-7.4.0/LICENSE": {
+      "from": "vendor/turf-7.4.0/LICENSE",
+      "sha256": "f9b32b82fd5a1d3a990526d86da97f42fb805d9f4d9f978125c4679b674fce44"
+    },
+    "vendor/usdm-editor/vendor/turf-7.4.0/turf.min.js": {
+      "from": "vendor/turf-7.4.0/turf.min.js",
+      "sha256": "5db5dda50210fa0f25394672383ba4a2e6fcde3c9e95ae0e21d62d327fc66d05"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+tools/node_modules/
+tools/.cache/
+verify-out/
+*.log
