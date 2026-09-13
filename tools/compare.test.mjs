@@ -877,8 +877,15 @@ section(10, 'a whole twelve-proposal session, end to end');
     `integrity ${tIntegrity} · briefs ${tBriefs} = ${total} ms`);
   console.log(`         ${comparisons.length} comparisons · ${regions.length} regions · ` +
     `${seams.length} seams · ${briefs.length} briefs`);
-  check(total < 15000,
-    `the whole session is ${(total / 1000).toFixed(1)} s — the catcher is 15 s`);
+  /* A CATCHER, not a promise — the editor's doctrine for every timing bar.
+     Measured 7.9 s on the dev machine and 15.9 s on a GitHub runner for the
+     same twelve proposals (CI runs this arithmetic about 2× slower, as it
+     does the editor's national gate), so a 15 s bar failed CI on the first
+     push while saying nothing about the code. 40 s is the number a naked
+     intersect or a lost memo would blow through on either machine. */
+  check(total < 40000,
+    `the whole session is ${(total / 1000).toFixed(1)} s — the catcher is 40 s ` +
+    '(measured 7.9 s dev, 15.9 s CI)');
   check(briefs.every((b) => b.length > 400), 'and every finding produced a brief with something in it');
 }
 
