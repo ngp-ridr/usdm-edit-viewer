@@ -173,6 +173,16 @@ export function createLoader({ session, say, live, note, onLoaded }) {
 
     try {
       const { proposal, warnings = [] } = await session.add(pkg, { fileName: name, sha256, source });
+      /* A REPEAT IS NOT A LOAD AND NOT A WARNING. The session answers a
+         duplicate id with the proposal it already holds and an `alreadyLoaded`
+         warning; counted here, said once by `announce`, and never painted over
+         the map — pressing Demo with the demo already up used to paint the
+         same sentence twelve times and toast "12 proposals loaded, with 12
+         warnings". Nothing changed, so nothing is listed. */
+      if (warnings.some((w) => w?.reason === 'alreadyLoaded')) {
+        report.duplicates += 1;
+        return proposal;
+      }
       report.loaded.push(proposal);
       for (const w of warnings) report.warnings.push(sentenceOf(w, name));
       return proposal;
@@ -406,8 +416,22 @@ export function createLoader({ session, say, live, note, onLoaded }) {
    * `wizard.js` `openFile`, and it is why `say` is called at most once here.
    */
   function announce(report) {
-    const { problems, warnings, loaded } = report;
-    if (!problems.length && !warnings.length) { note(null); return; }
+    const { problems, loaded, duplicates = 0 } = report;
+    /* Identical warnings collapse to one sentence with a count: a set of
+       twelve that all carry the same re-issued baseline says it once. */
+    const warnings = collapse(report.warnings);
+    if (!problems.length && !warnings.length) {
+      note(null);
+      if (duplicates) {
+        say(loaded.length
+          ? `${loaded.length} proposal${loaded.length === 1 ? '' : 's'} loaded; ` +
+            `${duplicates} ${duplicates === 1 ? 'was' : 'were'} already loaded.`
+          : duplicates === 1
+            ? SENTENCES.alreadyLoaded()
+            : `Those ${duplicates} proposals are already loaded.`);
+      }
+      return;
+    }
 
     if (problems.length) {
       /* The whole list on the map — a dropped folder can fail eight ways and a
@@ -437,7 +461,14 @@ export function createLoader({ session, say, live, note, onLoaded }) {
 /* ── Leaves ─────────────────────────────────────────────────────────────── */
 
 function emptyReport() {
-  return { loaded: [], problems: [], warnings: [], local: false };
+  return { loaded: [], problems: [], warnings: [], duplicates: 0, local: false };
+}
+
+/** Identical sentences become one, with how many times it was said. */
+function collapse(sentences) {
+  const counts = new Map();
+  for (const t of sentences) counts.set(t, (counts.get(t) ?? 0) + 1);
+  return [...counts].map(([t, n]) => (n > 1 ? `${t} (×${n})` : t));
 }
 
 /** The file name at the end of a url, for the sentences. */

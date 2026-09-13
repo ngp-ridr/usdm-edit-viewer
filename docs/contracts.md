@@ -1130,6 +1130,7 @@ the live region only.
 |---|---|
 | different week | "That proposal was drawn against \<other\>; this comparison is of \<week\> — load it in a session of its own." |
 | duplicate id | "That proposal is already loaded." |
+| every file a duplicate (e.g. Demo pressed twice) | "Those N proposals are already loaded." — one toast, nothing painted over the map; a lone duplicate keeps the singular sentence; duplicates mixed with new loads: "N proposals loaded; M were already loaded." |
 | reissued baseline | "\<Author\>'s proposal was drawn against a re-issued copy of the same week; it is loaded, and small differences along shared edges may be the baseline rather than the proposal." |
 | unknown `?focus=` | "That link points at a finding this set does not contain." |
 | refused `?load=` origin | "\<origin\> is not an origin this tool will fetch from." |

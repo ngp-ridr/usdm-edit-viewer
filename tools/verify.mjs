@@ -680,6 +680,30 @@ await shot('02-demo');
 
 /* ══ § 3 · the findings ═════════════════════════════════════════════════════ */
 
+/* ── PRESSING DEMO WITH THE DEMO ALREADY UP ────────────────────────────
+   Kyle opened the live site and found the same sentence painted over the map
+   twelve times — "That proposal is already loaded." × 12 — with a toast
+   claiming "12 proposals loaded, with 12 warnings". The session answers a
+   duplicate with an alreadyLoaded WARNING per package, and the intake painted
+   every warning. A repeat of a set you already have changes nothing, so it
+   says so once and paints nothing. Waited on the toast, asserted on the note. */
+await page.click('#btn-demo');
+await page.waitForFunction(() => [...document.querySelectorAll('.ridr-toast')]
+  .some((t) => /already loaded/.test(t.textContent)), null, { timeout: 60000 });
+const repeat = await page.evaluate(() => ({
+  toast: [...document.querySelectorAll('.ridr-toast')].map((t) => t.textContent.trim())
+    .find((t) => /already loaded/.test(t)) ?? '',
+  noteHidden: document.getElementById('app-note')?.hidden !== false
+    || !document.getElementById('app-note')?.textContent.trim(),
+  painted: (document.getElementById('app-note')?.textContent.match(/already loaded/g) ?? []).length,
+  rows: document.querySelectorAll('.proposal-row').length,
+}));
+check(repeat.toast === 'Those 12 proposals are already loaded.',
+  `pressing Demo again says it ONCE, as one sentence: "${repeat.toast}"`);
+check(repeat.noteHidden && repeat.painted === 0,
+  `and paints nothing over the map (${repeat.painted} copies in #app-note)`);
+check(repeat.rows === 12, `the drawer still lists twelve — nothing was added or doubled (${repeat.rows})`);
+
 step(3, 'the findings: conflicts first, and the three the fixtures name');
 
 {
