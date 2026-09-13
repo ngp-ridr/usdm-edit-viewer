@@ -1,0 +1,230 @@
+name: audit
+
+on:
+  # main only. A branch gets CI by opening a pull request (a draft is enough) —
+  # without the filter, one `git push` of a branch plus its PR runs the whole
+  # workflow twice on the same commit.
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # The full lane (unabridged verify.mjs + a11y-audit.mjs) is expensive enough
+  # that it does not belong on every push — see the verify job below. This is
+  # its other trigger, so drift is still caught within a day even when nobody
+  # runs workflow_dispatch by hand. 04:20 UTC is outside US and EU working
+  # hours, and twenty minutes off the editor's 04:00 so the two repos are not
+  # reading the same archive origin at the same instant.
+  schedule:
+    - cron: '20 4 * * *'
+
+# A superseded push or PR run is cancelled by the next one on the same ref;
+# nightly and hand-dispatched runs get a unique group so no push can ever
+# cancel a full sweep mid-flight.
+concurrency:
+  group: audit-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('manual-{0}', github.run_id) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+
+# The verify job reads the live USDM archive for the published-week side of a
+# seam. That is deliberate: the gate exists to prove the app works against the
+# real published product, and a fixture would only prove it works against a
+# fixture.
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: static gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+      # This job needs html-validate and four zero-dependency scripts — not a
+      # 130 MB Chromium the verify job caches for itself.
+      - run: npm ci --prefix tools
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      # Every module this app ships PARSES AS A MODULE — the vendored copy
+      # included. `node --check` reads a .js file as CommonJS, where a stray
+      # top-level `});` is legal, so a range delete can leave a file
+      # unparseable in a browser while every sub-second gate reports it fine.
+      - name: modules parse
+        run: node tools/parse.test.mjs
+
+      # Design tokens resolve, both themes are in parity, every measured
+      # contrast ratio still holds, neither published ramp has leaked into the
+      # theme, css/app.css carries no raw hex, and its kit-override count is
+      # true. A missing custom property is not an error in CSS — this is what
+      # makes it one here.
+      - name: design tokens
+        run: node tools/tokens.test.mjs
+
+      # The one inline script's CSP hash is current. Stale, and the anti-flash
+      # boot is silently blocked and the theme flash comes back while the page
+      # otherwise works perfectly — the quietest possible failure.
+      - name: CSP hash
+        run: node tools/csp-hash.mjs
+
+      # THE VENDORED COPY IS STILL THE EDITOR'S BYTES: every sha256 matches
+      # MANIFEST.json, nothing unlisted lives under vendor/usdm-editor/, every
+      # relative import in the copy AND in js/ resolves, and the page-relative
+      # AOI data files exist. An edited copy is a copy nobody can re-sync, and
+      # re-syncing is how this app inherits an editor fix.
+      - name: the vendored copy is unmodified
+        run: node tools/sync-from-editor.mjs --check
+
+      - name: html-validate
+        run: npx --prefix tools html-validate index.html
+
+  # ── the comparison engine, under Node, on the app's own vendored bytes ──────
+  # No install and no browser: these modules are DOM-free by contract
+  # (docs/contracts.md § 16.4) and turf comes from the vendored UMD. The `if`
+  # on each step is scaffolding for the parallel build-out — WP-C and WP-E
+  # deliver these files, and until then the job is green and says so. Delete
+  # the conditionals once both exist; a permanently-skipping gate is not a gate.
+  engine:
+    name: comparison engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # Rolling cache of immutable archive weeks. The seam tests back
+      # `fetchWeek` with tools/.cache/parquet_unclipped/ and SKIP when it is
+      # absent, so a cold cache is a smaller suite rather than a failure.
+      - name: cache archive weeks
+        uses: actions/cache@v4
+        with:
+          path: tools/.cache
+          key: usdm-viewer-parquet-${{ github.run_id }}
+          restore-keys: usdm-viewer-parquet-
+      - name: marks
+        run: |
+          if [ -f tools/marks.test.mjs ]; then node tools/marks.test.mjs;
+          else echo "tools/marks.test.mjs is not written yet (WP-C) — skipped"; fi
+      - name: compare, seams and briefs
+        run: |
+          if [ -f tools/compare.test.mjs ]; then node tools/compare.test.mjs;
+          else echo "tools/compare.test.mjs is not written yet (WP-E) — skipped"; fi
+
+  # ── the day-to-day lane: every push and pull request ────────────────────────
+  # --fast skips the sections that are expensive and low-signal for a change
+  # made mid-development; the skip roster is derived and printed by the run.
+  verify:
+    name: end to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+      - run: npm ci --prefix tools
+      # Keyed on the OS plus the exact Playwright version pinned in
+      # tools/package-lock.json, so a version bump gets a fresh cache instead of
+      # silently reusing last version's browser binary. The restore-keys prefix
+      # means an unrelated lock-file change restores the previous cache instead
+      # of re-downloading Chromium; the install step reconciles.
+      - name: cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('tools/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-playwright-
+      - run: npx --prefix tools playwright install --with-deps chromium
+      - name: cache archive weeks
+        uses: actions/cache@v4
+        with:
+          path: tools/.cache
+          key: usdm-viewer-verify-parquet-${{ github.run_id }}
+          restore-keys: usdm-viewer-verify-parquet-
+      - name: behavioural verification (fast lane)
+        run: |
+          if [ -f tools/verify.mjs ]; then node tools/verify.mjs --fast;
+          else echo "tools/verify.mjs is not written yet (WP-A, after integration) — skipped"; fi
+      # A FAILING check captures its section in every lane — a fast-lane CI
+      # failure with no artifact costs a rerun just to look at it.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify-screenshots
+          path: verify-out/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ── the full lane: by hand, or nightly ──────────────────────────────────────
+  verify-full:
+    name: end to end (full)
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+      - run: npm ci --prefix tools
+      - name: cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('tools/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-playwright-
+      - run: npx --prefix tools playwright install --with-deps chromium
+      - name: cache archive weeks
+        uses: actions/cache@v4
+        with:
+          path: tools/.cache
+          key: usdm-viewer-verify-parquet-${{ github.run_id }}
+          restore-keys: usdm-viewer-verify-parquet-
+      - name: behavioural verification (full lane)
+        run: |
+          if [ -f tools/verify.mjs ]; then node tools/verify.mjs;
+          else echo "tools/verify.mjs is not written yet (WP-A, after integration) — skipped"; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify-screenshots-full
+          path: verify-out/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # Its own job, not a step after the full verify: it has its own server and its
+  # own browser, so nothing forces the queueing — and a hang here can no longer
+  # sit behind a green verify. Nightly and dispatch only, like the full lane.
+  a11y:
+    name: accessibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+      - run: npm ci --prefix tools
+      - name: cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('tools/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-playwright-
+      - run: npx --prefix tools playwright install --with-deps chromium
+      - name: axe over the app's real states
+        run: |
+          if [ -f tools/a11y-audit.mjs ]; then node tools/a11y-audit.mjs;
+          else echo "tools/a11y-audit.mjs is not written yet (WP-A, after integration) — skipped"; fi

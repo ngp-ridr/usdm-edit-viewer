@@ -1,0 +1,11 @@
+{
+  "name": "usdm-edit-viewer-tools",
+  "private": true,
+  "type": "module",
+  "description": "Quality gates for the USDM Edit Viewer. Not shipped; the app itself has no build step and no runtime dependencies.",
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.1",
+    "html-validate": "^9.5.3",
+    "playwright": "1.62.1"
+  }
+}
