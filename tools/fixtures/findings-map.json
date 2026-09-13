@@ -1,0 +1,386 @@
+{
+  "$comment": [
+    "USDM Edit Viewer · tools/fixtures/findings-map.json — WP-C's map fixture.",
+    "",
+    "HAND-MADE, AND EVERY POLYGON IS A RECTANGLE. This file exists to exercise",
+    "js/map.js: that the four viewer sources receive what they are handed, that",
+    "the ladder puts each layer where the contract says, that hitTest resolves",
+    "conflict > one-sided > seam > change over SOURCE data, and that the",
+    "letters and dashes js/marks.js assigns reach the map. It is NOT a",
+    "comparison-engine fixture and nothing here was computed by js/compare.js:",
+    "the class labels, the areas and the run lengths are plausible rather than",
+    "derived, and the bands are schematic. tools/compare.test.mjs owns the real",
+    "corpus (demo/, twelve packages).",
+    "",
+    "The coordinates ARE real Northern Great Plains ground, in true WGS84 —",
+    "the same convention the USDM and the fsa-lfp-counties family use, never",
+    "the fleet's shifted composite. Two working areas (Montana and Wyoming,",
+    "as bounding rectangles), three proposals, four patches, one conflict, one",
+    "one-sided region, one reciprocal seam along the MT/WY line at 45°N and one",
+    "one-sided seam along the MT/ND meridian at 104.04°W whose far side is the",
+    "published week (North Dakota is deliberately not loaded).",
+    "",
+    "Shapes follow docs/contracts.md §§ 2, 4, 5 and 10."
+  ],
+
+  "week": "2026-09-08",
+
+  "aois": [
+    {
+      "kind": "state",
+      "id": "state:MT",
+      "name": "Montana",
+      "bbox": [-116.05, 44.36, -104.04, 49.0],
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [[[
+          [-116.05, 44.36], [-104.04, 44.36], [-104.04, 49.0], [-116.05, 49.0], [-116.05, 44.36]
+        ]]]
+      }
+    },
+    {
+      "kind": "state",
+      "id": "state:WY",
+      "name": "Wyoming",
+      "bbox": [-111.06, 40.99, -104.05, 45.01],
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [[[
+          [-111.06, 40.99], [-104.05, 40.99], [-104.05, 45.01], [-111.06, 45.01], [-111.06, 40.99]
+        ]]]
+      }
+    }
+  ],
+
+  "published": {
+    "D0": {
+      "type": "MultiPolygon",
+      "coordinates": [[[
+        [-112.0, 44.0], [-104.0, 44.0], [-104.0, 49.0], [-112.0, 49.0], [-112.0, 44.0]
+      ]]]
+    },
+    "D1": {
+      "type": "MultiPolygon",
+      "coordinates": [[[
+        [-110.0, 45.0], [-105.0, 45.0], [-105.0, 48.5], [-110.0, 48.5], [-110.0, 45.0]
+      ]]]
+    },
+    "D2": {
+      "type": "MultiPolygon",
+      "coordinates": [[[
+        [-108.0, 46.0], [-106.0, 46.0], [-106.0, 48.0], [-108.0, 48.0], [-108.0, 46.0]
+      ]]]
+    },
+    "D3": null,
+    "D4": null
+  },
+
+  "proposals": [
+    {
+      "id": "6f1c8a02d34b5e7190ab2c4d5e6f7081",
+      "shortId": "6f1c8a02",
+      "key": "state:MT@2026-09-08#6f1c8a02",
+      "week": "2026-09-08",
+      "aoiId": "state:MT",
+      "author": { "name": "Marla Teigen", "affiliation": "Montana Climate Office", "role": "State climatologist" },
+      "bands": {
+        "D0": {
+          "type": "MultiPolygon",
+          "coordinates": [[[
+            [-112.0, 44.36], [-104.04, 44.36], [-104.04, 49.0], [-112.0, 49.0], [-112.0, 44.36]
+          ]]]
+        },
+        "D1": {
+          "type": "MultiPolygon",
+          "coordinates": [[[
+            [-110.0, 45.0], [-105.0, 45.0], [-105.0, 48.5], [-110.0, 48.5], [-110.0, 45.0]
+          ]]]
+        },
+        "D2": {
+          "type": "MultiPolygon",
+          "coordinates": [[[
+            [-108.0, 46.0], [-106.0, 46.0], [-106.0, 48.0], [-108.0, 48.0], [-108.0, 46.0]
+          ]], [[
+            [-106.6, 45.0], [-105.4, 45.0], [-105.4, 45.9], [-106.6, 45.9], [-106.6, 45.0]
+          ]]]
+        },
+        "D3": null,
+        "D4": null
+      }
+    },
+    {
+      "id": "9d215f60c1a24b3e8f70d1c2b3a49586",
+      "shortId": "9d215f60",
+      "key": "state:MT@2026-09-08#9d215f60",
+      "week": "2026-09-08",
+      "aoiId": "state:MT",
+      "author": { "name": "Dana Reyes", "affiliation": "Hi-Line Producers Cooperative", "role": "Producer / land manager" },
+      "bands": {
+        "D0": {
+          "type": "MultiPolygon",
+          "coordinates": [[[
+            [-112.0, 44.36], [-104.04, 44.36], [-104.04, 49.0], [-112.0, 49.0], [-112.0, 44.36]
+          ]]]
+        },
+        "D1": {
+          "type": "MultiPolygon",
+          "coordinates": [[[
+            [-110.0, 45.0], [-105.0, 45.0], [-105.0, 48.5], [-110.0, 48.5], [-110.0, 45.0]
+          ]]]
+        },
+        "D2": {
+          "type": "MultiPolygon",
+          "coordinates": [[[
+            [-108.0, 46.0], [-106.0, 46.0], [-106.0, 48.0], [-108.0, 48.0], [-108.0, 46.0]
+          ]]]
+        },
+        "D3": {
+          "type": "MultiPolygon",
+          "coordinates": [[[
+            [-107.1, 48.45], [-106.1, 48.45], [-106.1, 48.95], [-107.1, 48.95], [-107.1, 48.45]
+          ]]]
+        },
+        "D4": null
+      }
+    },
+    {
+      "id": "53bc5877ae194c20b8d6f3a1c7e29045",
+      "shortId": "53bc5877",
+      "key": "state:WY@2026-09-08#53bc5877",
+      "week": "2026-09-08",
+      "aoiId": "state:WY",
+      "author": { "name": "Ruth Ellery", "affiliation": "Powder River Conservation District", "role": "Extension agent" },
+      "bands": {
+        "D0": {
+          "type": "MultiPolygon",
+          "coordinates": [[[
+            [-111.06, 40.99], [-104.05, 40.99], [-104.05, 45.01], [-111.06, 45.01], [-111.06, 40.99]
+          ]]]
+        },
+        "D1": null,
+        "D2": {
+          "type": "MultiPolygon",
+          "coordinates": [[[
+            [-108.0, 43.5], [-105.0, 43.5], [-105.0, 45.01], [-108.0, 45.01], [-108.0, 43.5]
+          ]]]
+        },
+        "D3": {
+          "type": "MultiPolygon",
+          "coordinates": [[[
+            [-107.0, 44.6], [-105.6, 44.6], [-105.6, 45.01], [-107.0, 45.01], [-107.0, 44.6]
+          ]]]
+        },
+        "D4": null
+      }
+    }
+  ],
+
+  "expectedMarks": {
+    "$comment": "Letters in LOAD ORDER across the session; the dash index cycles WITHIN an AOI, so Wyoming's only proposal is dash 0 again.",
+    "6f1c8a02d34b5e7190ab2c4d5e6f7081": { "letter": "A", "dash": 0 },
+    "9d215f60c1a24b3e8f70d1c2b3a49586": { "letter": "B", "dash": 1 },
+    "53bc5877ae194c20b8d6f3a1c7e29045": { "letter": "C", "dash": 0 }
+  },
+
+  "patches": [
+    {
+      "proposalId": "6f1c8a02d34b5e7190ab2c4d5e6f7081",
+      "key": "p-a1", "seq": 1, "mark": 0, "letter": "A",
+      "name": "the Milk River Hi-Line between Malta and Glasgow",
+      "anchor": [-106.95, 48.62],
+      "bbox": [-107.45, 48.3, -106.4, 49.0],
+      "areaKm2": 5998.3,
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-107.45, 48.3], [-106.4, 48.3], [-106.4, 49.0], [-107.45, 49.0], [-107.45, 48.3]
+        ]]
+      }
+    },
+    {
+      "proposalId": "6f1c8a02d34b5e7190ab2c4d5e6f7081",
+      "key": "p-a2", "seq": 2, "mark": 0, "letter": "A",
+      "name": "Powder River country south of Broadus",
+      "anchor": [-106.0, 45.45],
+      "bbox": [-106.6, 45.0, -105.4, 45.9],
+      "areaKm2": 9371.2,
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-106.6, 45.0], [-105.4, 45.0], [-105.4, 45.9], [-106.6, 45.9], [-106.6, 45.0]
+        ]]
+      }
+    },
+    {
+      "proposalId": "9d215f60c1a24b3e8f70d1c2b3a49586",
+      "key": "p-b1", "seq": 1, "mark": 1, "letter": "B",
+      "name": "the benches south of the Milk",
+      "anchor": [-106.6, 48.7],
+      "bbox": [-107.1, 48.45, -106.1, 48.95],
+      "areaKm2": 4074.1,
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-107.1, 48.45], [-106.1, 48.45], [-106.1, 48.95], [-107.1, 48.95], [-107.1, 48.45]
+        ]]
+      }
+    },
+    {
+      "proposalId": "53bc5877ae194c20b8d6f3a1c7e29045",
+      "key": "p-c1", "seq": 1, "mark": 0, "letter": "C",
+      "name": "Sheridan to Clearmont, north to the Montana line",
+      "anchor": [-106.3, 44.8],
+      "bbox": [-107.0, 44.6, -105.6, 45.0],
+      "areaKm2": 4911.4,
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-107.0, 44.6], [-105.6, 44.6], [-105.6, 45.0], [-107.0, 45.0], [-107.0, 44.6]
+        ]]
+      }
+    }
+  ],
+
+  "regions": [
+    {
+      "id": "disc:1a2b3c4d",
+      "key": "disc|conflict|state:MT|D0|D3|D1|-107.100,48.450,-106.400,48.950",
+      "kind": "conflict",
+      "changedBy": "both",
+      "proposalA": "6f1c8a02d34b5e7190ab2c4d5e6f7081",
+      "proposalB": "9d215f60c1a24b3e8f70d1c2b3a49586",
+      "classA": "D0",
+      "classB": "D3",
+      "published": "D1",
+      "magnitude": 3,
+      "directionA": "shrank",
+      "directionB": "grew",
+      "areaKm2": 2908.4,
+      "anchor": [-106.75, 48.7],
+      "bbox": [-107.1, 48.45, -106.4, 48.95],
+      "patchesA": ["p-a1"],
+      "patchesB": ["p-b1"],
+      "aoiId": "state:MT",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [[[
+          [-107.1, 48.45], [-106.4, 48.45], [-106.4, 48.95], [-107.1, 48.95], [-107.1, 48.45]
+        ]]]
+      }
+    },
+    {
+      "id": "disc:5e6f7a8b",
+      "key": "disc|one-sided|state:MT|D1|D2|D1|-106.600,45.000,-105.400,45.900",
+      "kind": "one-sided",
+      "changedBy": "A",
+      "proposalA": "6f1c8a02d34b5e7190ab2c4d5e6f7081",
+      "proposalB": "9d215f60c1a24b3e8f70d1c2b3a49586",
+      "classA": "D2",
+      "classB": "D1",
+      "published": "D1",
+      "magnitude": 1,
+      "directionA": "grew",
+      "directionB": "unchanged",
+      "areaKm2": 9371.2,
+      "anchor": [-106.0, 45.45],
+      "bbox": [-106.6, 45.0, -105.4, 45.9],
+      "patchesA": ["p-a2"],
+      "patchesB": [],
+      "aoiId": "state:MT",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [[[
+          [-106.6, 45.0], [-105.4, 45.0], [-105.4, 45.9], [-106.6, 45.9], [-106.6, 45.0]
+        ]]]
+      }
+    }
+  ],
+
+  "seams": [
+    {
+      "id": "seam:2c3d4e5f",
+      "key": "seam|state:MT|state:WY|53bc5877|6f1c8a02|0",
+      "kind": "seam",
+      "neighbourId": "state:WY",
+      "aoiIds": ["state:MT", "state:WY"],
+      "reciprocal": true,
+      "isNew": true,
+      "lengthKm": 110.3,
+      "newStepKm": 55.2,
+      "maxStep": 2,
+      "anchor": [-106.65, 45.0],
+      "sideA": { "kind": "proposal", "proposal": { "id": "6f1c8a02d34b5e7190ab2c4d5e6f7081" }, "aoi": "state:MT" },
+      "sideB": { "kind": "proposal", "proposal": { "id": "53bc5877ae194c20b8d6f3a1c7e29045" }, "aoi": "state:WY" },
+      "borderNotes": { "A": null, "B": null },
+      "edgeEffects": [],
+      "runs": [
+        {
+          "classA": "D1", "classB": "D3", "publishedA": "D2", "publishedB": "D2",
+          "step": 2, "publishedStep": 0, "kind": "new",
+          "lengthKm": 55.2, "changedBy": "both",
+          "from": [-107.0, 45.0], "to": [-106.3, 45.0], "midpoint": [-106.65, 45.0]
+        },
+        {
+          "classA": "D2", "classB": "D2", "publishedA": "D2", "publishedB": "D2",
+          "step": 0, "publishedStep": 0, "kind": "agree",
+          "lengthKm": 31.5, "changedBy": "both",
+          "from": [-106.3, 45.0], "to": [-105.9, 45.0], "midpoint": [-106.1, 45.0]
+        },
+        {
+          "classA": "D1", "classB": "D3", "publishedA": "D1", "publishedB": "D2",
+          "step": 2, "publishedStep": 1, "kind": "widened",
+          "lengthKm": 23.6, "changedBy": "B",
+          "from": [-105.9, 45.0], "to": [-105.6, 45.0], "midpoint": [-105.75, 45.0]
+        }
+      ]
+    },
+    {
+      "id": "seam:7a8b9c0d",
+      "key": "seam|state:MT|state:ND|6f1c8a02|pub|0",
+      "kind": "seam",
+      "neighbourId": "state:ND",
+      "aoiIds": ["state:MT", "state:ND"],
+      "reciprocal": false,
+      "isNew": false,
+      "lengthKm": 166.8,
+      "newStepKm": 0,
+      "maxStep": 2,
+      "anchor": [-104.04, 47.75],
+      "sideA": { "kind": "proposal", "proposal": { "id": "6f1c8a02d34b5e7190ab2c4d5e6f7081" }, "aoi": "state:MT" },
+      "sideB": { "kind": "published", "aoi": "state:ND" },
+      "borderNotes": { "A": null, "B": null },
+      "edgeEffects": [
+        {
+          "patchKey": "p-a1",
+          "seq": 1,
+          "neighborIds": ["state:ND"],
+          "neighborNames": ["North Dakota"],
+          "lengthKm": 166.8,
+          "statement": "D0 stops at the meridian: the proposal's D0 runs to the North Dakota line and the published week has none on the far side.",
+          "segments": {
+            "type": "MultiLineString",
+            "coordinates": [[[-104.04, 47.0], [-104.04, 48.5]]]
+          }
+        }
+      ],
+      "runs": [
+        {
+          "classA": "none", "classB": "D1", "publishedA": "D0", "publishedB": "D1",
+          "step": 2, "publishedStep": 1, "kind": "widened",
+          "lengthKm": 166.8, "changedBy": "A",
+          "from": [-104.04, 47.0], "to": [-104.04, 48.5], "midpoint": [-104.04, 47.75]
+        }
+      ]
+    }
+  ],
+
+  "probes": {
+    "$comment": "Points tools/verify.mjs and the WP-C smoke can click, with the answer hitTest must give. Every one is an INTERIOR point chosen by hand — never a centroid, which for a USDM polygon is regularly outside it.",
+    "conflictInterior": { "at": [-106.75, 48.7], "expect": { "kind": "conflict", "id": "disc:1a2b3c4d" } },
+    "oneSidedInterior": { "at": [-106.0, 45.45], "expect": { "kind": "one-sided", "id": "disc:5e6f7a8b" } },
+    "seamReciprocal": { "at": [-106.65, 45.001], "expect": { "kind": "seam", "id": "seam:2c3d4e5f" } },
+    "seamOneSided": { "at": [-104.04, 47.75], "expect": { "kind": "seam", "id": "seam:7a8b9c0d" } },
+    "patchOnly": { "at": [-107.3, 48.4], "expect": { "kind": "change", "id": "p-a1" } },
+    "nothing": { "at": [-113.5, 46.5], "expect": null }
+  }
+}
