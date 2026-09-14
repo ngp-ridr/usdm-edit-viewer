@@ -9,7 +9,7 @@
    three TopoJSON files it names but never opens.
 
    APP-SIDE ON PURPOSE: this module is allowed `fetch` — the quarantine that
-   keeps the rules engine (topology/changeset/session/heuristic) Node-runnable.
+   keeps the rules engine (topology/changeset/session) Node-runnable.
    Nothing here decides anything about drought.
 
    ── The id grammar — `kind:key`, carried by the URL, session archives and

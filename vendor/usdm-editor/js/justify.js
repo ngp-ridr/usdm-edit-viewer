@@ -92,10 +92,25 @@ export const FIELD_LABELS = Object.freeze({
  * `evidence-N` is computed rather than listed: the validator's keys are
  * per-row, so there is no fixed set of them to enumerate. One-based, because
  * the author sees rows, not indices.
+ *
+ * AND NAMED BY KIND WHEN THE JUSTIFICATION IS IN HAND. An evidence row is a
+ * link or a photo, and a photo whose data URI failed the gate used to be
+ * refused as "Evidence link 3" — sending the author to look for a row that,
+ * on screen, holds a picture. `data` is optional because two callers have it
+ * and a label must never become undefined for the one that does not; without
+ * it the row is described as a link, which is what the overwhelming majority
+ * of them are.
+ *
+ * @param {string} key
+ * @param {object} [data] the whole justification, for the evidence row's kind
  */
-export function fieldLabel(key) {
+export function fieldLabel(key, data = null) {
   const m = /^evidence-(\d+)$/.exec(key);
-  if (m) return `Evidence link ${Number(m[1]) + 1}`;
+  if (m) {
+    const i = Number(m[1]);
+    const kind = data?.evidence?.[i]?.image != null ? 'photo' : 'link';
+    return `Evidence ${kind} ${i + 1}`;
+  }
   return FIELD_LABELS[key] ?? key;
 }
 
@@ -107,8 +122,8 @@ export function fieldLabel(key) {
  * and the fields themselves are all marked and reachable; this sentence exists
  * to get the author to the right form, not to replace it.
  */
-export function namedProblems(problems) {
-  const names = Object.keys(problems ?? {}).map(fieldLabel);
+export function namedProblems(problems, data = null) {
+  const names = Object.keys(problems ?? {}).map((k) => fieldLabel(k, data));
   if (!names.length) return '';
   if (names.length === 1) return names[0];
   if (names.length === 2) return `${names[0]} and ${names[1]}`;
@@ -177,7 +192,14 @@ export function initExplainForm({ container, value, onChange, richText, openLarg
   /* ── narrative ────────────────────────────────────────────────────────── */
   /* `RATIONALE_LABEL` is module scope now — see FIELD_LABELS, which a refusal
      reads to NAME this field rather than counting it. */
-  const RATIONALE_HINT = 'Please provide an overarching narrative for your proposed changes.';
+  /* THE HOUSE VOICE, which the Impacts hint four lines below already speaks:
+     declarative, no "please", says what the field is for rather than asking
+     for it. "Please provide an overarching narrative for your proposed
+     changes" was the one sentence on this card written in form-letter — two
+     registers on one screen, and the politer one was the one that said least. */
+  const RATIONALE_HINT = 'The case for the proposal as a whole — what the week ' +
+    'looked like on the ground, and why these changes together describe it ' +
+    'better than the published map.';
   /** Whatever `richText` built, or null. Returned to the caller. */
   let rationaleCtl = null;
   if (typeof richText === 'function') {
@@ -199,8 +221,11 @@ export function initExplainForm({ container, value, onChange, richText, openLarg
       /* "Larger editor": the same markdown in the dialog (js/md-modal.js),
          where a photo can go in. The dialog writes through to `data` and
          mirrors into this field; its id differs from the field's own. */
+      /* NO `sub`: the dialog uses the field's own hint as its subtitle, so a
+         second sentence here would be the same guidance twice (js/md-modal.js
+         § EACH THING SAID ONCE). */
       expand: openLarge ? () => openLarge({
-        title: RATIONALE_LABEL, sub: 'The overarching narrative for the proposal',
+        title: RATIONALE_LABEL,
         id: 'annotate-rationale', label: RATIONALE_LABEL, required: true, hint: RATIONALE_HINT,
         value: data.rationale,
         onChange: (v) => {
@@ -567,7 +592,8 @@ function textField(id, label, { required, multiline, hint, type = 'text', get, s
        dialog writes through the caller's onChange and `mirror`s back here. */
     const big = el('button', {
       type: 'button', class: 'nav-btn md-expand',
-      'aria-label': `Larger editor for ${label}, in a dialog`, title: 'Open in a larger editor',
+      'aria-label': `Larger editor — open ${label} in a dialog`,
+      title: 'Open in a larger editor',
     }, 'Larger editor');
     big.addEventListener('click', () => expand({ mirror: (v) => { input.value = v; } }));
     wrap.append(big);

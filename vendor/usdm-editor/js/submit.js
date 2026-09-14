@@ -39,7 +39,6 @@ import {
   areaKm2, tally, validateContours, validateDerivedBands, deriveBands, deriveContours, ruleContainedIn,
   meanWidthM, RESIDUE_WIDTH_M,
 } from './topology.js';
-import { checkChangeMagnitude } from './heuristic.js';
 import { priorWeek, weekUrl } from './archive.js';
 import { validateJustification } from './justify.js';
 import { changeName, deriveEdgeEffects } from './changes.js';
@@ -48,7 +47,7 @@ import { loadNeighborGeometries } from './aoi.js';
    the package. `buildProposalGeoJSON` stays exported from js/geojson.js and
    directly Node-tested; nothing in this file needs the RFC 7946 shape. */
 import { buildEdgeBrief } from './geojson.js';
-import { fmtMi2, MI2 } from './units.js';
+import { fmtMi2, fmtMi2Notice, km2ToMi2, MI2 } from './units.js';
 import { gzipText } from './gzip.js';
 
 export const PACKAGE_SCHEMA = 'usdm-edit-proposal/2';
@@ -336,27 +335,27 @@ export async function buildPackageCore(ctx, { onProgress = () => {} } = {}) {
   const extentBands = cs.bands;
   const baselineBands = cs.baselineBands;
 
-  onProgress('Comparing against last week…');
-  await tick();
   const mf = ctx.manifest;
-  /* "No warning" and "no check" are different claims: `warnings: []` must not
-     read as "ran clean" when there is no prior week or it would not load, so
-     the package says which case it is. `warnings` is derived from this and
-     keeps its old shape for anything already reading it. */
-  const heuristic = ctx.priorData?.contours
-    ? checkChangeMagnitude({
-        proposedContours: cs.contours,
-        baselineContours: cs.baselineContours,
-        previousContours: ctx.priorData.contours,
-      })
-    /* Only the manifest can say "there IS no previous week". Without one, all
-       we honestly know is that we do not have last week's contours. */
-    : { skipped: mf?.weeks && !priorWeek(mf.weeks, ctx.week)
-          ? 'no-prior-week'
-          : 'prior-week-unavailable' };
+  /* THE ONE-CLASS-PER-WEEK NORM IS A GATE RULE, NOT A HEURISTIC. A proposal is
+     the FOLLOWING week's map drawn from the published one, so "one class a
+     week" is proposal vs the map being edited — `ruleOneClassMove`, which
+     `validation` below carries. The `heuristic` key stays in the package for
+     readers of older files (until 2026-09-14 it held a comparison against the
+     week BEFORE the published one, which charged NDMC's own week-over-week
+     change to the author: a South Dakota proposal whose every edit moved one
+     class read "17% … moves two or more classes"); it now records that the
+     norm was enforced, and by what. `warnings` keeps its shape, empty. */
+  const heuristic = {
+    code: 'one-class-move',
+    enforced: 'gate',
+    rule: 'one-class-move',
+    message: `One class of change a week is a gate rule here (ruleOneClassMove, against the ` +
+      `published ${ctx.week} map); there is no separate check against the week before.`,
+  };
 
   const shaOf = (w) => (w ? mf?.byWeek.get(w)?.sha256 ?? null : null);
-  const priorWeekId = ctx.priorData?.week ?? null;
+  /* Provenance only: which week preceded the one this proposal was drawn from. */
+  const priorWeekId = mf?.weeks ? priorWeek(mf.weeks, ctx.week) : null;
 
   const changes = CLASSES.filter((c) => cs.editedClasses.includes(c)).map((c) => ({
     class: c,
@@ -485,7 +484,7 @@ export async function buildPackageCore(ctx, { onProgress = () => {} } = {}) {
        justification it just stamped; reserved here to fix its position. */
     edgeBrief: null,
     heuristic,
-    warnings: heuristic && !heuristic.skipped && heuristic.flagged ? [heuristic] : [],
+    warnings: [],
     validation: {
       /* Both gates ran on the FULL national geometry, which is why their
          results are here even though that geometry is not. */
@@ -779,15 +778,55 @@ export function renderDeltaTable(rows) {
     const sw = el('span', { class: 'legend-swatch' });
     sw.style.background = USDM_COLORS[cls];   // CSSOM, never a style attribute
     const d = r.areaKm2.delta;
+    const [before, after, change] = areaCells(r.areaKm2.before, r.areaKm2.after, d);
     tb.append(el('tr', {},
       el('td', {}, el('span', { class: 'swatch-cell' }, sw, `${cls} · ${USDM_LABELS[cls]}`)),
-      ...[fmtArea(r.areaKm2.before), fmtArea(r.areaKm2.after),
-          `${d >= 0 ? '+' : '−'}${fmtArea(Math.abs(d))}`,
+      ...[before, after, `${d >= 0 ? '+' : '−'}${change}`,
           `${r.parts.before} → ${r.parts.after}`]
         .map((text) => el('td', { class: 'num' }, text))));
   }
+  /* A CAPTION, not a nearby heading. The table was named only by whatever <h*>
+     happened to precede it — an association a screen reader cannot make (WCAG
+     1.3.1), and the heading changes between the two screens this renderer
+     serves. `.sr-only` is the kit's own visually-hidden utility: the column
+     headers already say what the numbers are, so the caption is for the people
+     who cannot see them next to each other. */
   return el('div', { class: 'table-scroll' },
-    el('table', { class: 'delta-table' }, el('thead', {}, htr), tb));
+    el('table', { class: 'delta-table' },
+      el('caption', { class: 'sr-only' },
+        'Area and part count of each edited drought class, before and after this proposal, ' +
+        'in square miles.'),
+      el('thead', {}, htr), tb));
+}
+
+/**
+ * The three area cells of one row, at ONE precision.
+ *
+ * They used to be formatted independently, so `fmtArea`'s "one decimal under
+ * 100, none above" applied per cell and a row could read `23,683 | 23,682 |
+ * −0.7` — three numbers at two precisions that do not add up, about one piece
+ * of ground (#17). The precision is chosen once, from the LARGEST of the
+ * three, because that is the number whose magnitude says how much the geometry
+ * knows; a cell the row's precision would round away to a bare `0` keeps
+ * enough of its own to be seen, since "0" beside two five-digit areas is the
+ * table saying nothing happened when something did.
+ *
+ * @param {number} before km²
+ * @param {number} after km²
+ * @param {number} delta km², signed — the caller writes the sign
+ * @returns {[string, string, string]} before, after, |change|, unit-free
+ */
+function areaCells(before, after, delta) {
+  const mi2 = (km2) => Math.abs(km2ToMi2(km2));
+  const mag = Math.max(mi2(before), mi2(after), mi2(delta));
+  const digits = mag >= 100 ? 0 : mag >= 1 ? 1 : 2;
+  const cell = (km2) => {
+    const v = mi2(km2);
+    if (v > 0 && Number(v.toFixed(digits)) === 0) return fmtMi2Notice(Math.abs(km2));
+    return v.toLocaleString(undefined,
+      { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  };
+  return [cell(before), cell(after), cell(delta)];
 }
 
 /** Areas, in SQUARE MILES from a km² input, at a precision that does not imply

@@ -240,7 +240,13 @@ carried alongside rather than thrown away.
 
 `heuristic` is kept on the Proposal minus its `samples` (WP-D): the card renders
 the verdict's sentence and can zoom to its `geometry`, and the sample lattice is
-the only part worth dropping.
+the only part worth dropping. **Files written from 2026-09-14 carry no
+comparison here**: a proposal is the FOLLOWING week's map drawn from the
+published one, so the editor enforces the one-class norm as a gate rule
+(`ruleOneClassMove`) and the block reads `{ code: 'one-class-move', enforced:
+'gate', message }` — the card shows the sentence as a hint. Older files still
+carry the prior-week comparison (`sampled`/`flagged`/`skipped`) and render as
+before.
 
 ---
 

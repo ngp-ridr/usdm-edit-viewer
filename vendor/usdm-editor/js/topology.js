@@ -44,7 +44,7 @@
 
 /* The ONE import: the miles an author reads. js/units.js is DOM-free and
    turf-free, so the engine stays runnable under Node (§ 14h scans it). */
-import { fmtMi2, fmtMi2Fine, fmtFt, FT_PER_M, MI2 } from './units.js';
+import { fmtMi2, fmtMi2Fine, fmtMi2Notice, fmtFt, FT_PER_M, MI2 } from './units.js';
 
 export const CLASSES = Object.freeze(['D0', 'D1', 'D2', 'D3', 'D4']);
 
@@ -447,17 +447,72 @@ export function nestingLeakGeometry(raw, healed, cls) {
  * says mutually exclusive class polygons are to be derived from its rows.
  */
 export function deriveBands(contours) {
-  const turf = T();
   const bands = { D4: asMulti(contours.D4) };
   for (let n = 3; n >= 0; n--) {
     const outer = asMulti(contours['D' + n]);
     const inner = asMulti(contours['D' + (n + 1)]);
     if (!outer) { bands['D' + n] = null; continue; }
     bands['D' + n] = inner
-      ? dropResidueParts(asMulti(turf.difference(turf.featureCollection([asFeature(outer), asFeature(inner)]))))
+      ? dropResidueParts(robustDifference(outer, inner, `D${n} ∖ D${n + 1}`))
       : outer;
   }
   return bands;
+}
+
+/**
+ * `turf.difference` that does not take the proposal down with it.
+ *
+ * polygon-clipping THROWS ("Unable to complete output ring starting at …")
+ * on operands it cannot node — measured twice on the South Dakota / Big Sioux
+ * line, where a folded national contour carries spike vertices the fold's
+ * union emitted along the state line (2026-09-08 session 367e00a2: D2 ∖ D3
+ * and D0 ∖ D1 both threw; tools/fixtures/sd-big-sioux-clipper.json.gz holds
+ * the pairs). Inside `deriveBands` at package time that was the step-4 gate
+ * dying with the clipper's sentence and no way forward.
+ *
+ * THE LADDER, each rung tried only if the one before threw, and each one
+ * measured on the fixture: (1) the operands as given; (2) `scrubResidue` on
+ * both — removes exactly the spikes that provoked the throw and nothing the
+ * archive itself carries (§ 21e), area identical; (3) coordinates snapped to
+ * 1e-10° (~10 µm), area identical to the metre; (4) 1e-8° (~1 mm), area
+ * within 0.002 km² of 2.6 million. A rung that is not the first says so once
+ * on the console — a heal, measured and told — and the last rethrows with a
+ * sentence that names the place, so the author is told where to look rather
+ * than handed the clipper's internals. `applyToNational` scrubs its own
+ * output so rung 1 is the one that runs; this is the belt under it.
+ */
+export function robustDifference(outer, inner, label = 'difference') {
+  const turf = T();
+  const diff = (a, b) => asMulti(turf.difference(turf.featureCollection([asFeature(a), asFeature(b)])));
+  const rungs = [
+    ['as given', (a, b) => diff(a, b)],
+    ['scrubbed operands', (a, b) => diff(scrubResidue(a), scrubResidue(b))],
+    ['coordinates snapped to 1e-10°', (a, b) => diff(snap(a, 10), snap(b, 10))],
+    ['coordinates snapped to 1e-8°', (a, b) => diff(snap(a, 8), snap(b, 8))],
+  ];
+  let last = null;
+  for (const [name, fn] of rungs) {
+    try {
+      const out = fn(outer, inner);
+      if (name !== 'as given') console.warn(`[usdm/topology] ${label}: the clipper threw on the operands as given and succeeded with ${name}.`);
+      return out;
+    } catch (err) { last = err; }
+  }
+  const at = String(last?.message ?? '').match(/ends at \[([-\d.]+), ([-\d.]+)\]/);
+  const where = at ? ` near ${Number(at[2]).toFixed(3)}°N, ${Math.abs(Number(at[1])).toFixed(3)}°W` : '';
+  const e = new Error(`The map library could not separate ${label}${where} — an edge there runs too close ` +
+    'to another one. Reshape the edge in that area (a few hundred metres is enough) and try again.');
+  e.cause = last;
+  throw e;
+}
+
+/** Coordinates rounded to `decimals` places — a fresh geometry, the input untouched. */
+function snap(geometry, decimals) {
+  const g = asMulti(geometry);
+  if (!g) return null;
+  const k = 10 ** decimals;
+  const r = (v) => Math.round(v * k) / k;
+  return { type: 'MultiPolygon', coordinates: g.coordinates.map((part) => part.map((ring) => ring.map(([x, y]) => [r(x), r(y)]))) };
 }
 
 /**
@@ -475,6 +530,31 @@ function dropResidueParts(geometry) {
     turf.area({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: part } }) >= MIN_PART_AREA_M2);
   if (kept.length === g.coordinates.length) return g;
   return kept.length ? { type: 'MultiPolygon', coordinates: kept } : null;
+}
+
+/**
+ * The clipper's residue, removed: `despike` (out-and-back spurs ON a ring)
+ * then the part floor (parts that ARE a spur — a 4-vertex needle with two
+ * coincident vertices and ~1e-6 m² of area). The two catch different shapes
+ * of the same thing, and both only ever remove what `ruleNoDegenerateParts`
+ * would refuse or what carries no area.
+ *
+ * WHY THIS RUNS ON WHAT THE OPS PRODUCE (js/changeset.js `tidy`) and on what a
+ * restore brings back, and not only inside `deriveBands`: an edit whose
+ * clipped edge coincides with the working-area ring leaves a needle along the
+ * ring — measured 5 km long at 1e-6 m² on the North Dakota / 49°N line
+ * (2026-09-08 session) and 2 km at 8.6e-8 m² along the Red River (docs/
+ * deferred.md, 2026-09-12). `deriveBands` dropped it, so the map painted
+ * clean, but `validate()` reads the CONTOURS, so the gate stayed red, and the
+ * author had no ring to select and nothing to drag. Safe on the archive's own
+ * geometry: over the healed national contours of 2026-08-11, 2026-09-08 and
+ * 2020-10-20 `despike` removes 0 of ~10,800 vertices per week and the floor
+ * drops 0 parts; on a clipped state baseline it touches only what the clip
+ * itself invented (Florida's coastline clip: 7 of 18,835 vertices). Cost:
+ * 0.8 ms for every class of Montana.
+ */
+export function scrubResidue(geometry) {
+  return dropResidueParts(despike(geometry));
 }
 
 /* ── measurement ──────────────────────────────────────────────────────────── */
@@ -749,6 +829,7 @@ export function ruleContainedIn(inner, outer, {
 export function ruleOneClassMove(baselineContours, workingContours, {
   toleranceM2 = CONTAINMENT_TOLERANCE_M2,
   region = undefined,
+  baselineLabel = null,
 } = {}) {
   const turf = T();
   const id = 'one-class-move';
@@ -814,8 +895,15 @@ export function ruleOneClassMove(baselineContours, workingContours, {
      UI zooms to. The verb is named because the fix differs: an over-improvement
      is undone by degrading it back, and vice versa. */
   return fail(id,
-    `${fmtMi2(total)} ${MI2} moves more than one drought class from the ` +
-    `published week — the largest is ${fmtMi2(worst.km2)} ${MI2} that ` +
+    /* `fmtMi2Notice`: this rule fires on residue-scale pieces too, and at
+       `fmtMi2`'s precision both numbers printed as "0" — a check that reports
+       "0 mi² moves more than one drought class … the largest is 0 mi²" is a
+       failure nobody can act on or believe (#17). */
+    /* THE DATE, NOT "LAST WEEK": a proposal is the FOLLOWING week's map drawn
+       from the published one, and relative words sent an author looking for a
+       second class their edits never made (2026-09-14). */
+    `${fmtMi2Notice(total)} ${MI2} moves more than one drought class from the ` +
+    `published ${baselineLabel ?? 'map'}${baselineLabel ? ' map' : ''} — the largest is ${fmtMi2Notice(worst.km2)} ${MI2} that ` +
     `${worst.dir === 'improve' ? 'improved past' : 'degraded past'} ` +
     `${worst.to}. Only one class of change a week is allowed, so this needs ` +
     `${worst.dir === 'improve' ? 'degrading' : 'improving'} back by one.`, all);
@@ -1155,6 +1243,7 @@ export function validateContours(contours, {
   changedRegion = null,
   baselineContours = null,
   narrowOneClassMove = false,
+  baselineLabel = null,
 } = {}) {
   const results = [];
   for (const c of CLASSES) {
@@ -1187,7 +1276,7 @@ export function validateContours(contours, {
        is healed and whose `changedRegion` is exact; the exported gate keeps
        the full algebra (see the rule's header for why nesting is required). */
     results.push(ruleOneClassMove(baselineContours, contours, {
-      toleranceM2, ...(narrowOneClassMove ? { region: changedRegion ?? null } : {}),
+      toleranceM2, baselineLabel, ...(narrowOneClassMove ? { region: changedRegion ?? null } : {}),
     }));
   }
   return {
@@ -1233,12 +1322,40 @@ export function validateDerivedBands(bands, {
      on 2011-01-11 (the measurements are at `RESIDUE_WIDTH_M`). So an overlap
      fails only if it is also WIDER than residue (mean width =
      2·area/perimeter); a corrupted band (verify § 7j replaces D2 with a
-     square) is kilometres wide and still fails. */
-  const turf = T();
+     square) is kilometres wide and still fails.
+
+     BBOX-PREFILTERED, like every other boolean op in this file. This was the
+     one naked `turf.intersect` left in it: four whole-band intersections, each
+     handed every part of two national classes. `partsNear` in both directions
+     then `intersectNear` is EXACT here for the same reason it is exact for
+     `rulePartsDontOverlap` — a part whose bounding box misses every box on the
+     far side contributes no area to the intersection, so dropping it cannot
+     change `m2`, cannot change `meanWidthM`, and cannot turn a failure into a
+     pass. (`partsNear(a, bNear)` rather than `partsNear(a, b)` loses nothing
+     either: a part of `b` that the first pass dropped missed every box of `a`,
+     so no part of `a` was reaching it.)
+
+     THE WIN IS SMALL AND THE REASON IS WORTH KEEPING. Measured over the four
+     national pairs (2026-09-08 folded back from Montana): the filter drops
+     31→25, 47→31, 35→20 and 41→9 parts, and the four intersects go 118→112,
+     108→104, 68→65 and 25→19 ms — 319 → 300 ms, inside a 1,483 ms
+     `finalize()`. The parts a bounding box can prove innocent are the SMALL
+     ones, and the clipper is priced in vertices; what this buys is the
+     doctrine, not the millisecond.
+
+     IDENTICAL RESULTS, CHECKED AGAINST THE ARCHIVE. 179 adjacent-class pairs
+     over 47 weeks sampled across 2000-2026 (the two residue weeks named above
+     among them: 2011-01-11 reports 6,429,988 m² at 21.1 m either way,
+     2020-10-20 69,546 m² at 0.5 m) agree on the verdict, on the area, on the
+     mean width, and on `JSON.stringify(both)` — zero mismatches. The bytes
+     matter as much as the verdict, because `both` is the geometry a failure
+     hands the UI to zoom to. Over those 179 pairs the prefilter took 6,998 ms
+     against the naked 7,466: 6.3% less. */
   for (let n = 0; n < 4; n++) {
     const a = asMulti(bands['D' + n]), b = asMulti(bands['D' + (n + 1)]);
     if (!a || !b) continue;
-    const both = asMulti(turf.intersect(turf.featureCollection([asFeature(a), asFeature(b)])));
+    const bNear = partsNear(b, a);
+    const both = bNear ? intersectNear(a, bNear) : null;
     const m2 = both ? areaKm2(both) * 1e6 : 0;
     const width = both ? meanWidthM(both) : 0;
     results.push(withClass(m2 > toleranceM2 && width > RESIDUE_WIDTH_M

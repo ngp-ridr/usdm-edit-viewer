@@ -46,6 +46,34 @@ export function fmtMi2Fine(km2) {
   return km2ToMi2(km2).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+/** The smallest area a notice will print; below it, it says so in words. */
+export const MI2_FLOOR = 0.01;
+
+/**
+ * A bare area in square miles for a NOTICE — a check row, an advice row.
+ *
+ * Neither of the two above is right for these. `fmtMi2`'s precision (one
+ * decimal under 100, none above) is the precision a PROPOSAL's areas are
+ * known to, and every residue-scale quantity printed through it came out a
+ * bare "0": an advisory asserting a leak it had just measured ("put 0 mi² of
+ * D1 outside D0 here"), a check reading "0 mi² moves more than one drought
+ * class … the largest is 0 mi²" (#17). `fmtMi2Fine`'s two decimals fix those
+ * and ruin the big ones — "1,149.22 mi²" claims a centimetre-scale answer for
+ * a freehand polygon.
+ *
+ * So: a hundredth of a square mile under one square mile, `fmtMi2` at and
+ * above it, and under a hundredth it stops pretending and says "under 0.01".
+ * Every caller appends the unit itself, so that reads "under 0.01 mi²".
+ */
+export function fmtMi2Notice(km2) {
+  if (!Number.isFinite(km2)) return 'not measured';
+  const mi2 = km2ToMi2(km2);
+  if (mi2 <= 0) return '0';
+  if (mi2 < MI2_FLOOR) return `under ${MI2_FLOOR}`;
+  if (mi2 < 1) return mi2.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return fmtMi2(km2);
+}
+
 /** A bare distance in miles, from km — one decimal under 10 miles. */
 export function fmtMi(km) {
   if (!Number.isFinite(km)) return 'not measured';

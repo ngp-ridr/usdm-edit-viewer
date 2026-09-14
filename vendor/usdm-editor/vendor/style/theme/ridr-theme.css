@@ -194,11 +194,23 @@
    brown here — that is the correct trade, and the USDM ramp is untouched
    either way.
 
+   THE SELECTION RING IS THE ONE TOKEN THAT DOES NOT GO TO INK. It was
+   #000000 here, and that made every line mark on the map one colour: the ring,
+   --text-primary (the AOI dash and the patch outlines) and --map-reach-line
+   all read black at 2 px, so "the thing you picked" was separated from "the
+   scope" and "a change" by dash and width alone. High contrast DARKENS it
+   instead — #1a357f against the light theme's #1f3f9e, 11.29:1 on white
+   against 9.28 — so it still gains contrast in the direction this theme always
+   moves, and still reads as navy rather than ink. 1.86:1 against #000000 is
+   not a text ratio and is not meant to be: what separates the ring from the
+   black marks beside it is hue plus the 1.5px white casing below.
+
    Measured (all on #ffffff; raised #f0f0f0 in parentheses):
      --text-primary  #000000  21.00 (18.43)   --text-secondary #111111 18.88 (16.57)
      --text-muted    #1a1a1a  17.40 (15.27)   --text-dim       #333333 12.63 (11.09)
      --accent        #1f4620  10.74  (9.42)   --accent-line    #163216 13.98 (12.27)
      --ochre         #8a5417   6.25  (5.48)   --ochre-dark     #6b4211  8.70  (7.64)
+     --selection-ring #1a357f 11.29  (9.91)   (vs #000000 1.86, vs D0 #ffff00 10.52)
      white on --accent 10.74                  white on --accent-dk 13.98 */
 [data-theme="high-contrast"] {
   --bg-deep:        #ffffff;
@@ -217,7 +229,10 @@
   --accent-line:    #163216;
   --accent-hover:   rgba(31,70,32,0.12);
   --text-on-accent: #ffffff;
-  --selection-ring: #000000;
+  /* NOT ink — see the header. A deeper navy than the light theme's logo blue
+     (11.29:1 on white against 9.28), so the mark that means "the thing you
+     picked" is the one line on this map that is not black. */
+  --selection-ring: #1a357f;
   --selection-casing: 1.5px;
   --sage:           #2c5f2e;
   --sage-dark:      #1f4620;

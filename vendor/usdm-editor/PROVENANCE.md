@@ -11,15 +11,15 @@ editor's origin at runtime: this page runs under `default-src 'none'` with
 | | |
 |---|---|
 | source | `../usdm-editor` (https://github.com/ngp-ridr/usdm-editor) |
-| commit | `a6620a50910a915b3a5dcee51df4789f56f3346c` |
-| subject | verifyPackage reads clipper residue as residue: 12 of 12 example proposals re-verify clean, and the wizard stops calling its own files hand-edited |
-| synced | 2026-09-13T05:41:42.383Z |
-| files | 58 |
+| commit | `3596c8232f1a61466350bc3b4bd5fd319133eea1` |
+| subject | A proposal is the FOLLOWING week's map: the one-class norm is the gate rule against the map being edited, and the prior-week "change-magnitude" check is gone |
+| synced | 2026-09-14T16:17:18.498Z |
+| files | 57 |
 
 | prefix | files |
 |---|---|
 | `vendor/aoi/` | 4 |
-| `vendor/usdm-editor/js/` | 19 |
+| `vendor/usdm-editor/js/` | 18 |
 | `vendor/usdm-editor/vendor/VENDORED.md/` | 1 |
 | `vendor/usdm-editor/vendor/fzstd-0.1.1/` | 2 |
 | `vendor/usdm-editor/vendor/hyparquet-1.28.2/` | 2 |

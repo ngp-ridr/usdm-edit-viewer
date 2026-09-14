@@ -86,11 +86,41 @@ function opaqueHalo(color) {
  * of the data. Live-shaded rather than a baked raster so the colours derive
  * per theme (one source serves light and high-contrast both), and global
  * because a globe that stops at the border is worse than one that does not.
+ *
+ * ── `maxzoom` IS 11, NOT 15, AND IT IS ON THE SOURCE ───────────────────────
+ * Terrain was the largest byte category on this page: 256-px tiles against a
+ * 512-px default means MapLibre asks for DEM tiles one level BELOW the map's
+ * own zoom, so every zoom step quadrupled the ask and kept going to z15 — all
+ * of it under class fills at opacity 1.0, which is to say mostly invisible.
+ * Measured on `?aoi=state:MT` (1440×900, cumulative DEM image requests at the
+ * state fit, then z7 → z9 → z11 → z13, two runs each):
+ *
+ *     maxzoom 15    78 → 102 → 126 → 146 → 170    (81 → 105 → 129 → 149 → 173)
+ *     maxzoom 11    87 → 111 → 135 → 144 → 144    (90 → 114 → 138 → 147 → 147)
+ *
+ * The base count varies by a handful run to run — the globe picks its own
+ * horizon — so read the MARGINAL cost of a zoom step instead: +24/+24/+20/+24
+ * against +24/+24/+9/+0. The cap bites exactly where the DEM was being fetched
+ * for nothing, and a deep zoom now asks for no new tiles at all. Screenshots
+ * at z9, z11 and z13 over central Montana: z9 and z11 are indistinguishable,
+ * z13 is softer and still reads as relief.
+ *
+ * ON THE SOURCE, deliberately, and not `maxzoom` on the two hillshade LAYERS.
+ * A layer maxzoom HIDES the layer above it — relief would simply vanish the
+ * moment an author zoomed in to draw, which is the zoom at which they are
+ * looking hardest at the ground. A source maxzoom makes MapLibre OVERZOOM the
+ * deepest tile it has, so relief still reads at every zoom and merely stops
+ * gaining detail. 11 rather than 10 because a state fit lands near z6-7 and
+ * the DEM is already one level ahead of the camera: 11 keeps native-resolution
+ * relief through the whole range anyone edits at, and the smoothing past it is
+ * invisible under a drought class. The `over` hillshade reads through the
+ * fills on the user's explicit instruction (§ Hillshade, over) and is the
+ * reason the layer answer was not acceptable here.
  */
 export const TERRARIUM_DEM = {
   type: 'raster-dem',
   tileSize: 256,
-  maxzoom: 15,
+  maxzoom: 11,
   encoding: 'terrarium',
   tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
   attribution: 'Terrain: Mapzen/AWS Open Data',

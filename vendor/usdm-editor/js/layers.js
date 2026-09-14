@@ -151,6 +151,12 @@ const COUNTY_TILES_URL = 'https://data.sustainable-fsa.com/data-tiles/tiles/fsa-
    the state/nation/aoi lines that own that edge. */
 const COUNTY_EDGE_OPACITY = 0.54;
 
+/* The one view the county grid is not drawn in. The national pose is z3.4
+   (NATIONAL_POSE, js/app.js); 4 is the first step above it, and a working area
+   of any kind fits well past it. See the layer for why a floor came back after
+   the old `minzoom: 5` was deliberately removed. */
+const COUNTY_MINZOOM = 4;
+
 /**
  * Register the pmtiles:// protocol from the vendored bundle, once.
  *
@@ -831,10 +837,21 @@ export function createLayerStack(map, { topojson = globalThis.topojson } = {}) {
 
     /* AFTER BOOT, not during it: the counties competed with the archive for
        bandwidth on the boot path even before they streamed (the old 842 KB
-       mesh surfaced as downstream flakiness). ALWAYS ON once landed, width
-       interpolated instead of a zoom gate: 3,221 counties' worth of line is
-       noise at national zoom, and a width that thins with the zoom answers
-       that without hiding the layer. The explicit beforeId re-claims the
+       mesh surfaced as downstream flakiness).
+
+       A ZOOM FLOOR AT THE NATIONAL VIEW, AND NOTHING ABOVE IT. This layer had
+       `minzoom: 5` once, which made the county grid something you discovered by
+       zooming rather than something the map had; that gate came off and the
+       width was zoom-interpolated instead (0.4px at z3 → 1.0 at z8). The
+       interpolation is right and stays — but 3,221 counties of line at 0.4px
+       over the national pose is not a grid, it is moiré: at z3.4 the spacing
+       approaches the pixel and the lines beat against the USDM fills instead of
+       resolving. `minzoom: 4` removes exactly that one view. Every working view
+       is above it (a state fits at z≈5, a tribal area higher), so the lines are
+       still there the moment the map is about anywhere in particular — which is
+       the whole of what dropping the old gate was for.
+
+       The explicit beforeId re-claims the
        exact ladder slot the mesh layer had — below `boundary-state`, and
        safely under the labels `raiseReferenceGeography()` has already raised.
        MapLibre resolves the PMTiles header (one small range read) into
@@ -855,6 +872,7 @@ export function createLayerStack(map, { topojson = globalThis.topojson } = {}) {
         });
         map.addLayer({
           id: 'boundary-county', type: 'line', source: SRC_COUNTY, 'source-layer': 'counties',
+          minzoom: COUNTY_MINZOOM,
           paint: {
             'line-color': cssVar('--map-county-line', 'rgba(26,26,26,0.25)'),
             'line-width': ['interpolate', ['linear'], ['zoom'], 3, 0.4, 8, 1.0],

@@ -3,7 +3,7 @@
    The edit model: a working area, the contours inside it, what the author has
    changed, and how that folds back into the national geometry.
 
-   DOM-free, like js/topology.js and js/heuristic.js — persistence is injected,
+   DOM-free, like js/topology.js — persistence is injected,
    not imported, so the same model runs under Node in a test.
 
    The editor never works on the nation (union/difference there is ~6.0/7.5 s;
@@ -32,12 +32,35 @@
 
 import {
   CLASSES, asMulti, asFeature, areaKm2, tally, indexParts, ringBBox, bboxOverlaps, envelopeOf,
-  clipToAOI, healContours, deriveBands, despike, validateContours, validateDerivedBands,
+  clipToAOI, healContours, deriveBands, despike, scrubResidue, validateContours, validateDerivedBands,
   T, ruleContainedIn, CONTAINMENT_TOLERANCE_M2, partsNear,
   unionNear, differenceNear, intersectNear, changedBBoxRegion, cascadeContainment,
 } from './topology.js';
 
 const clone = (x) => (x == null ? null : JSON.parse(JSON.stringify(x)));
+
+/**
+ * One sentence for a `lastScrub` report, shared by the restore sentences
+ * (js/session-io.js, js/checkpoints.js) and the Checks panel's repair
+ * (js/app.js) so the same removal is never described two ways. A part gone is
+ * a "zero-area fragment"; a vertex gone with its part intact is a "stray
+ * vertex" (a spur `despike` took off a ring). '' when nothing came off.
+ */
+export function describeScrub(report) {
+  if (!report?.length) return '';
+  const parts = report.filter((r) => r.parts > 0);
+  const spurs = report.filter((r) => r.parts === 0 && r.vertices > 0);
+  const clauses = [];
+  if (parts.length) {
+    const n = parts.reduce((sum, r) => sum + r.parts, 0);
+    clauses.push(`${n === 1 ? 'a zero-area fragment' : `${n} zero-area fragments`} from ${parts.map((r) => r.usdmClass).join(', ')}`);
+  }
+  if (spurs.length) {
+    const n = spurs.reduce((sum, r) => sum + r.vertices, 0);
+    clauses.push(`${n === 1 ? 'a stray vertex' : `${n} stray vertices`} from ${spurs.map((r) => r.usdmClass).join(', ')}`);
+  }
+  return `Removed ${clauses.join(' and ')}.`;
+}
 
 /* Below this, a residual diff is clipper noise and a reset may snap the class
    to the baseline object verbatim (see `resetShape`). One square metre: the
@@ -100,9 +123,9 @@ export function createChangeset({ contours, aoi, bbox, meta = {} } = {}) {
   let baselineBandsMemo = null;
 
   /* ── The version counter and the memos it guards ─────────────────────────
-     `working` is written at exactly five sites — `applyEntry` (undo/redo),
+     `working` is written at exactly six sites — `applyEntry` (undo/redo),
      `setContour`, `finishCascade` (the tail every cascading op shares),
-     `revert` and `restoreSnapshot` — and every one of them calls `touch()`,
+     `revert`, `restoreSnapshot` and `dropResidue` — and every one of them calls `touch()`,
      which bumps `version` and drops the four memos below. Nothing else may
      assign `working`; a write that forgets `touch()` serves a stale check
      over moved geometry, which is the one failure this design cannot see.
@@ -219,11 +242,37 @@ export function createChangeset({ contours, aoi, bbox, meta = {} } = {}) {
      visibly by `clipShape` first (or the op refuses), and committed VERTICES
      never pass through here — `setContourCascading` holds them to
      `assertInsideAOI` unclipped. Same class of normalization as `asMulti()`.
-     5–20 ms on near-parts geometry; a no-op for a bbox working area. */
+     5–20 ms on near-parts geometry; the clip is a no-op for a bbox working area.
+
+     AND THEN THE RESIDUE COMES OFF (`scrubResidue`, js/topology.js). The clip
+     re-emits the boundary; the difference behind an op emits zero-width
+     needles along every edge two contours share — and where an op's edge
+     coincides with the working-area ring the two compound into a 4-vertex
+     needle that `deriveBands` drops but `validate()` sees: "D1 contour has 1
+     part with effectively no area", on ground the author cannot select
+     because it has no interior. Measured 5 km × 1e-6 m² on North Dakota's
+     49°N line (2026-09-08). Every op and the cascade's `clean` hook come
+     through here, so one scrub covers every verb, every scope and every
+     heal; §§ 21a–b pin it. */
   function tidy(geometry) {
-    if (!area.geometry || !geometry) return geometry;
-    return clipToAOI(indexParts(geometry), area.geometry, area.bbox);
+    if (!geometry) return null;
+    const clipped = area.geometry ? clipToAOI(indexParts(geometry), area.geometry, area.bbox) : geometry;
+    return scrubResidue(clipped);
   }
+
+  /** What a scrub removed, per class — `[]` when nothing did. */
+  function scrubReport(before, after) {
+    const out = [];
+    for (const c of CLASSES) {
+      if (!before[c]) continue;
+      const a = tally(before[c]), b = tally(after[c]);
+      if (a.parts !== b.parts || a.verts !== b.verts) {
+        out.push({ usdmClass: c, parts: a.parts - b.parts, vertices: a.verts - b.verts });
+      }
+    }
+    return out;
+  }
+  let lastScrub = [];
 
   /** G5: an author's drawn shape, cut to the working area. Null = all outside. */
   function clipShape(shape) {
@@ -710,6 +759,14 @@ export function createChangeset({ contours, aoi, bbox, meta = {} } = {}) {
     },
     get canUndo() { return undoStack.length > 0; },
     get canRedo() { return redoStack.length > 0; },
+    /* WHAT THE NEXT UNDO WOULD TAKE BACK, in the words the op wrote — read
+       BEFORE calling `undo()`, which pops the entry that carries them. Two
+       read-only getters and no new state: js/app.js says the label out loud
+       ("Undid reshape D2."), and an undo that announces nothing is
+       indistinguishable from a key that did nothing to somebody who cannot see
+       the map move. */
+    get undoLabel() { return undoStack.at(-1)?.label ?? null; },
+    get redoLabel() { return redoStack.at(-1)?.label ?? null; },
 
     /** Throw the whole working area back to the archive. */
     revert() {
@@ -757,15 +814,57 @@ export function createChangeset({ contours, aoi, bbox, meta = {} } = {}) {
          Built and checked BEFORE the undo entry is pushed, so a snapshot that
          is rejected halfway through leaves neither geometry nor history: a
          restore either happens whole or does not happen. */
+      const given = {};
+      for (const c of CLASSES) given[c] = contours[c] ? asMulti(clone(contours[c])) : null;
+      /* HEALED ON THE WAY IN, like nesting is at fetch: a session or checkpoint
+         saved before the ops scrubbed their own output can carry a zero-area
+         needle (the 2026-09-08 North Dakota session did, in D1 and in its one
+         checkpoint), and restoring it verbatim restores a red gate the author
+         cannot clear. What came off is in `lastScrub` for the caller's
+         sentence — measured and told, never swallowed. */
       const next = {};
-      for (const c of CLASSES) next[c] = contours[c] ? asMulti(clone(contours[c])) : null;
+      for (const c of CLASSES) next[c] = scrubResidue(given[c]);
       for (const c of CLASSES) assertInsideAOI(c, next[c]);
       pushUndo(fullEntry(label));
       redoStack.length = 0;
       working = next;
       dirty = new Set(editedClasses);
+      lastScrub = scrubReport(given, next);
       touch();
       return api;
+    },
+
+    /** What the last `restoreSnapshot` or `dropResidue` removed:
+     *  `[{ usdmClass, parts, vertices }]`, empty when nothing came off. */
+    get lastScrub() { return lastScrub.map((r) => ({ ...r })); },
+
+    /**
+     * The repair the Checks panel offers against "effectively no area": drop
+     * every zero-area part and spur across all classes, as ONE undoable step.
+     *
+     * With `tidy` scrubbing every op's output this is reachable only for
+     * geometry that arrived by another door — an old draft through
+     * `setContour`, a hand-edited file — but a gate an author cannot clear is
+     * the failure this exists to prevent, so the door stays. Classes that
+     * changed are marked edited (their contour is no longer the published one).
+     *
+     * @returns {{applied: boolean, classes: string[], label: string, reason?: string}}
+     */
+    dropResidue({ label = 'remove zero-area fragments' } = {}) {
+      const next = {};
+      for (const c of CLASSES) next[c] = scrubResidue(working[c]);
+      const report = scrubReport(working, next);
+      if (!report.length) {
+        return { applied: false, classes: [], label, reason: 'There is nothing here to remove.' };
+      }
+      pushUndo(fullEntry(label));
+      redoStack.length = 0;
+      working = next;
+      const classes = report.map((r) => r.usdmClass);
+      for (const c of classes) dirty.add(c);
+      lastScrub = report;
+      touch();
+      return { applied: true, classes, label };
     },
 
     /** The §3a gate over the working extent. Cheap — this is the live check. */
@@ -779,7 +878,9 @@ export function createChangeset({ contours, aoi, bbox, meta = {} } = {}) {
          computed fresh, never memoized: the memo is for the one default
          question every panel asks. */
       if (Object.keys(opts).length) {
-        return validateContours(working, { scope: 'extent', baselineContours: baseline, ...opts });
+        return validateContours(working, {
+          scope: 'extent', baselineContours: baseline, baselineLabel: meta?.week ?? null, ...opts,
+        });
       }
       if (!validateMemo) {
         const t0 = now();
@@ -787,7 +888,7 @@ export function createChangeset({ contours, aoi, bbox, meta = {} } = {}) {
            because THIS baseline is healed (nested), which the rule's header
            proves is what the narrowing needs. `api.changedRegion` is the memo. */
         validateMemo = validateContours(working, {
-          scope: 'extent', baselineContours: baseline,
+          scope: 'extent', baselineContours: baseline, baselineLabel: meta?.week ?? null,
           narrowOneClassMove: true, changedRegion: api.changedRegion,
         });
         stats.validateMs = Math.round(now() - t0);
@@ -885,8 +986,17 @@ export function createChangeset({ contours, aoi, bbox, meta = {} } = {}) {
 
         /* One union over the pieces. This is also what dissolves the clip
            boundary: the Sutherland–Hodgman artifacts that the bbox prefilter
-           leaves along the cut line are interior to this union and disappear. */
-        out[c] = asMulti(turf.union(turf.featureCollection(pieces.map((g) => asFeature(g)))));
+           leaves along the cut line are interior to this union and disappear.
+
+           SCRUBBED, like everything else an op produces (`tidy`): where the
+           edited geometry and the remainder both trace the working-area ring
+           the union emits spike vertices along it, and on the South Dakota /
+           Big Sioux line those made polygon-clipping THROW inside the very
+           next step, `deriveBands` (2026-09-08 session 367e00a2 — two class
+           pairs). `scrubResidue` on the output is what clears it; § 21e is
+           the measurement that it costs the archive's own geometry nothing,
+           and §§ 7c/10b hold the identity fold's parts and holes exact. */
+        out[c] = scrubResidue(asMulti(turf.union(turf.featureCollection(pieces.map((g) => asFeature(g))))));
       }
       return out;
     },
@@ -992,7 +1102,7 @@ export function perClassDiffs(baseline, working, aoi = null) {
   const area = aoi ? normalizeAOI(aoi) : null;
   /* Clipping the result to the working area. Differencing two contours that
      were each clipped to the same boundary can leave hairlines along that
-     boundary; they are not changes and would drag the heuristic's sample grid
+     boundary; they are not changes and would drag every consumer of a diff
      out to the edge — with a polygon AOI, out along a state line a thousand
      vertices long. */
   const clip = (g) => (g && area ? clipToAOI(indexParts(g), area.geometry, area.bbox) : g);
@@ -1005,7 +1115,7 @@ export function perClassDiffs(baseline, working, aoi = null) {
       /* `despike`: differencing two contours that agree on thousands of shared
          vertices leaves out-and-back needles along the shared edges — zero
          width, but 30 km long, and every consumer of a diff (patch bboxes, the
-         thread detector's 0.5 km growth, the heuristic's sample grid) reads
+         thread detector's 0.5 km growth) reads
          extent. See the function. */
       added = despike(turf.difference(turf.featureCollection([asFeature(b), asFeature(a)])));
       removed = despike(turf.difference(turf.featureCollection([asFeature(a), asFeature(b)])));
@@ -1048,7 +1158,7 @@ export function mergedDiffRegion(diffs) {
 
 /**
  * Where inside the working area the proposal differs from its baseline — the
- * region the §3b heuristic samples and the region the national gate scopes to.
+ * region the national gate scopes to.
  *
  * The third argument takes anything `normalizeAOI` does, INCLUDING a bare
  * `[w,s,e,n]`, which is what js/submit.js passes (`cs.bbox`) and what this

@@ -528,7 +528,12 @@ const TOOLS = Object.freeze([
   { key: 'italic', glyph: 'I',     label: 'Italic' },
   { key: 'ul',     glyph: '•',     label: 'Bulleted list' },
   { key: 'ol',     glyph: '1.',    label: 'Numbered list' },
-  { key: 'link',   glyph: 'Link',  label: 'Link' },
+  /* "Insert link", not "Link" (#24): "Link" was a whole accessible name inside
+     two others on the same screen — the evidence row's "Add a link" and the
+     navbar's "Copy a link to this view" — which is exactly the ambiguity the
+     house rule forbids. The GLYPH stays the word "Link", so the visible label
+     is still a substring of the accessible name (WCAG 2.5.3). */
+  { key: 'link',   glyph: 'Link',  label: 'Insert link' },
   { key: 'image',  glyph: 'Image', label: 'Image', images: true },
 ]);
 
@@ -591,6 +596,18 @@ export function initMdText({
      rich surface names itself with through `aria-labelledby`. A contenteditable
      div cannot be the target of a `for`, so it has to be the other direction. */
   const lab = el('label', { for: id, id: `lbl-${id}` }, label ?? '');
+  /* AND A QUALIFIER NOBODY SEES (#24). The field's accessible name was exactly
+     the visible label — "Impacts observed" — which is a whole accessible name
+     sitting inside two others in the same field group: this field's own
+     "Larger editor for Impacts observed, in a dialog" and "Choose an image for
+     Impacts observed". Neither button can stop naming its field (three of them
+     share one card and the name is all that tells them apart), so it is the
+     SHORTER name that moves, which is what the rule prescribes.
+     `sr-only` keeps the visible label the plain words it always was, so WCAG
+     2.5.3 still holds: "Impacts observed" is a substring of "Impacts observed,
+     markdown". And it is true — this field stores markdown, which is the one
+     thing about it a reader cannot see. */
+  lab.append(el('span', { class: 'sr-only' }, ', markdown'));
   if (required) lab.append(el('span', { class: 'req', 'aria-hidden': 'true' }, ' *'));
   root.append(lab);
   if (hint) root.append(el('p', { class: 'hint' }, `${hint} ${STORED_NOTE}`));
@@ -636,10 +653,16 @@ export function initMdText({
     /* Not `.md-tool`: it is a way to a bigger surface, not a format. The name
        carries the field's label so several on one card stay distinct, and the
        label sits mid-string so "Change 1" and "Change 10" cannot contain each
-       other (the § 9f rule). */
+       other (the § 9f rule).
+
+       IT READS AS THE ACTION IT IS (#24) — "Larger editor for X, in a dialog"
+       named a place and left what pressing it would do to be inferred. The
+       visible words stay first in the string, because the accessible name has
+       to contain the visible label (WCAG 2.5.3). */
     const big = el('button', {
       type: 'button', class: 'nav-btn md-expand',
-      'aria-label': `Larger editor for ${label ?? id}, in a dialog`, title: 'Open in a larger editor',
+      'aria-label': `Larger editor — open ${label ?? id} in a dialog`,
+      title: 'Open in a larger editor',
     }, 'Larger editor');
     big.addEventListener('click', () => expand(), on);
     bar.append(big);
@@ -672,6 +695,12 @@ export function initMdText({
     'aria-multiline': 'true',
     'aria-labelledby': `lbl-${id}`,
     'aria-describedby': `err-${id}`,
+    /* MIRRORED, exactly as `aria-invalid` is by `showError` below and for the
+       same reason: in Write mode THIS is the control a screen reader is
+       sitting on, and the `required` the textarea carries is a fact about a
+       hidden element. A required field that announces as optional is a field
+       somebody skips. */
+    ...(required ? { 'aria-required': 'true' } : {}),
     hidden: '',
   });
 
@@ -718,6 +747,27 @@ export function initMdText({
   /** Set while THIS module is writing one view from another, so neither side's
    *  change handler mistakes its own echo for something the author did. */
   let syncing = false;
+  /** WHICH LOAD THE RICH VIEW IS SHOWING. Bumped by every `loadRich`, and the
+   *  reason the echo gate is not a flag and a string compare: Squire batches
+   *  its own input events on a timer of its own, so a batch raised against the
+   *  view as it stood BEFORE a load can be delivered after `syncing` is clear —
+   *  and the markdown it serialises is the markdown the author had just
+   *  replaced. Written in the Source view, that batch silently put the old
+   *  sentence back (#5). */
+  let gen = 0;
+  /** The last few generations' fingerprints — what the rich view serialised to
+   *  immediately after each load, before anybody could touch it. An echo that
+   *  matches one of these is that generation's batch arriving late; nothing at
+   *  this generation could have produced it. Newest last. */
+  const serials = [];
+  /** How many to remember. Two loads can land back to back (a mode flip while
+   *  a textarea input is still mirroring), so one is not enough; four covers
+   *  every path here and costs a few short strings. */
+  const SERIAL_MEMORY = 4;
+  /** The generation whose content the author has actually edited. Once an echo
+   *  has been ACCEPTED at this generation the stale-batch gate stands down, so
+   *  a real edit that happens to reproduce an earlier text still lands. */
+  let echoGen = -1;
   /** Did a PERSON put their hands on the source view before the rich surface
    *  finished loading? Only trusted events count: the harness assigns
    *  `.value` and dispatches an untrusted `input`, which is not somebody
@@ -798,6 +848,15 @@ export function initMdText({
          textarea holds the markdown, so identical re-serialization means
          nothing happened; a real edit always changes the string. */
       if (md === ta.value) return;
+      /* ── AND THE GENERATION GATE. The compare above is race-free about the
+         CURRENT view and says nothing about a batch raised against an earlier
+         one: a bulk replacement made in Source serialises differently from
+         what a late batch carries, so the stale text passed the compare and
+         was written back over the author's (#5). Two conditions, so this can
+         only ever drop an echo nobody could have meant: the serialisation is
+         one a LOAD produced, and the author has not yet edited at this
+         generation. */
+      if (echoGen < gen && serials.includes(md)) return;
       /* The textarea is written WITHOUT an event: it is the mirror here, not
          the source, and dispatching would re-enter through the handler above
          and re-render the view the author is typing in. */
@@ -805,6 +864,7 @@ export function initMdText({
       ta.value = md;
       syncing = false;
       touched = true;
+      echoGen = gen;
       onChange?.(md);
     });
     s.addEventListener('pathChange', syncTools);
@@ -873,8 +933,15 @@ export function initMdText({
    */
   function loadRich(md) {
     if (!sq) return;
+    gen += 1;
     syncing = true;
     try { sq.setHTML(richHTML(md)); } catch { /* leave the view as it was */ }
+    /* THE GENERATION'S FINGERPRINT, taken synchronously — what this load
+       serialises to with nobody's hands on it yet. A batch that arrives later
+       carrying one of these is a batch from before a load, and the echo gate
+       drops it. Cheap: the field holds prose, not a document. */
+    try { serials.push(toMarkdown(rich)); } catch { /* nothing to fingerprint */ }
+    if (serials.length > SERIAL_MEMORY) serials.shift();
     queueMicrotask(() => { syncing = false; });
     syncTools();
   }

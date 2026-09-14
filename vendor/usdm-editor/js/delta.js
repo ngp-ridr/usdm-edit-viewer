@@ -219,12 +219,49 @@ function prepare(geometry) {
  *
  * The whole-envelope test first, because 30 pairs of a six-level partition are
  * mostly nowhere near each other and arithmetic is free.
+ *
+ * ── ONE PASS, BOTH SIDES, AND WHY NOT A SWEEP LINE ─────────────────────────
+ * The two sets fall out of a single pairwise pass: `a_i` is kept iff it meets
+ * some `b_j`, `b_j` iff it meets some `a_i`. That second predicate is stated in
+ * the code below against ALL of `b`'s partners rather than against the surviving
+ * `nearA`, and the two are the same set — if `b_j` meets any `a_i` at all, that
+ * `a_i` is in `nearA` by the first predicate. So the marking pass replaces a
+ * second filter that re-ran the same comparisons, and both lists are emitted in
+ * their original part order, which is what keeps the concatenated output
+ * byte-identical.
+ *
+ * A sort-by-minX event sweep was written and MEASURED against this, because
+ * pairwise is O(|a|·|b|) and this file's neighbours say never. It loses, and not
+ * marginally: the operands here are AOI-CLIPPED bands, which run to single-digit
+ * part counts (Montana, 6 committed edits: none/D0..D4 = 2/6/4/4/1/0 before and
+ * 2/9/7/7/2/0 after — 367 bbox comparisons across all 30 pairs), and at those
+ * sizes the event array, its sort and two live sets cost 2.6-3.4 µs against
+ * 0.3-1.0 µs for the pass below. The sweep only overtakes above ~200 parts a
+ * side and wins properly at 1,000 (4,338 → 997 µs), which is a national band,
+ * which is a shape `deriveChangeMap` never receives.
+ *
+ * The premise behind looking at all was wrong, and the number is worth keeping
+ * so nobody re-opens it: of the 406 ms a first switch to the change view costs
+ * (Montana, 6 edits), the bbox prefilter is 0.1 ms. `partitionOf` is 2 × ~104 ms
+ * (a `deriveBands` and the `none` difference per side) and `turf.intersect` is
+ * 199 ms across the 17 pairs that survive the filter.
  */
 function intersectLevels(a, b) {
   if (!bboxOverlaps(a.bbox, b.bbox)) return null;
-  const nearA = a.parts.filter((p) => b.parts.some((q) => bboxOverlaps(p.bbox, q.bbox)));
+  const aHit = new Uint8Array(a.parts.length);
+  const bHit = new Uint8Array(b.parts.length);
+  for (let i = 0; i < a.parts.length; i++) {
+    for (let j = 0; j < b.parts.length; j++) {
+      if (!bboxOverlaps(a.parts[i].bbox, b.parts[j].bbox)) continue;
+      aHit[i] = 1;
+      bHit[j] = 1;
+    }
+  }
+  const nearA = [];
+  for (let i = 0; i < a.parts.length; i++) if (aHit[i]) nearA.push(a.parts[i]);
   if (!nearA.length) return null;
-  const nearB = b.parts.filter((q) => nearA.some((p) => bboxOverlaps(p.bbox, q.bbox)));
+  const nearB = [];
+  for (let j = 0; j < b.parts.length; j++) if (bHit[j]) nearB.push(b.parts[j]);
   if (!nearB.length) return null;
   const turf = T();
   return asMulti(turf.intersect(turf.featureCollection([

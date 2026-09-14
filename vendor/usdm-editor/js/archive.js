@@ -169,6 +169,57 @@ export async function fetchManifest({ signal } = {}) {
   return { weeks, byWeek, latest: weeks[weeks.length - 1] };
 }
 
+/**
+ * A plain sentence for a failure this module knows how to have, or null.
+ *
+ * EVERY THROW IN THIS FILE IS WRITTEN FOR THE CONSOLE — `[usdm/archive]
+ * 2026-08-11 → HTTP 404` names the module, the week and the mechanism, which is
+ * exactly what somebody maintaining the archive wants and exactly what nobody
+ * reading a note above a map wants. hyparquet's are worse ("parquet file
+ * invalid (footer != PAR1)") and the platform's are worst of all ("Failed to
+ * fetch", which in Safari is "Load failed" and in Firefox is
+ * "NetworkError when attempting to fetch resource").
+ *
+ * So the shapes this app can actually have are recognised here and given a
+ * sentence about the ARCHIVE, and everything else returns NULL rather than a
+ * guess — a caller that cannot name the failure says only what it knows and
+ * leaves `err.message` to `console.error`. A wrong plain sentence is worse than
+ * an opaque true one.
+ *
+ * The match is on the message text on purpose: these errors cross a `fetch`, a
+ * vendored decoder and a dynamic import, and none of them carries a code this
+ * app could switch on.
+ *
+ * @param {unknown} err       whatever was thrown
+ * @param {string}  subject   what was being read — a week, or 'the week list'
+ * @returns {string|null}     one sentence, or null if the shape is unknown
+ */
+export function describeFailure(err, subject = 'the archive') {
+  const msg = String(err?.message ?? '');
+  const name = String(err?.name ?? '');
+  /* A deadline is a connection, not a bad week: `err.message` for an abort is
+     "signal timed out", which names the mechanism and not the thing the reader
+     can do something about. */
+  if (name === 'TimeoutError' || name === 'AbortError') {
+    return 'The archive did not respond — check your connection.';
+  }
+  const http = /→ HTTP (\d{3})/.exec(msg);
+  if (http) return `The archive answered ${http[1]} for ${subject}.`;
+  if (/parquet/i.test(msg) && /(PAR1|invalid|magic|not a parquet)/i.test(msg)) {
+    return `The archive's file for ${subject} is not a parquet file.`;
+  }
+  if (/compression/i.test(msg)) {
+    return `The archive's file for ${subject} uses a compression this app cannot read.`;
+  }
+  /* The network shape, last, because it is the broadest: a bare `TypeError` out
+     of `fetch` is how every browser reports DNS, TLS, CORS, an offline machine
+     and a blocked origin, and none of them can be told apart from here. */
+  if (name === 'TypeError' || /failed to fetch|networkerror|load failed|network ?error/i.test(msg)) {
+    return 'The archive could not be reached.';
+  }
+  return null;
+}
+
 /** The published week immediately before `week`, or null if it is the earliest. */
 export function priorWeek(weeks, week) {
   const i = weeks.indexOf(week);
@@ -237,8 +288,16 @@ export async function fetchWeek(week, { signal, onProgress } = {}) {
   if (healed) {
     const worst = Object.keys(leaks).sort((a, b) => leaksM2[b] - leaksM2[a])[0];
     const inner = `D${Number(worst.slice(1)) + 1}`;
-    console.warn(`[usdm/archive] ${week}: ${inner} extends ` +
-      `${(leaksM2[worst] / 1e6).toLocaleString(undefined, { maximumFractionDigits: 1 })} km² ` +
+    /* NEVER "extends 0 km²". The gate above is `CONTAINMENT_TOLERANCE_M2`
+       (100 m²), and one decimal of a square kilometre rounded everything under
+       50,000 m² to zero — a line asserting a leak and measuring none on every
+       boot (#17). Under a hundredth it says so in words, which is the same
+       answer `fmtMi2Notice` gives the author in miles. */
+    const km2 = leaksM2[worst] / 1e6;
+    const measured = km2 < 0.01
+      ? 'under 0.01'
+      : km2.toLocaleString(undefined, { maximumFractionDigits: km2 < 1 ? 2 : 1 });
+    console.warn(`[usdm/archive] ${week}: ${inner} extends ${measured} km² ` +
       `outside ${worst} in the archive's rows (${Object.keys(leaks).length} of 4 pairs leak); ` +
       `nested before use.`);
   }
@@ -300,15 +359,15 @@ export function createWeekCache() {
 }
 
 /**
- * Everything the editor needs to open a week: the week itself and the week
- * before it — the baseline the change-magnitude heuristic (js/heuristic.js,
- * handoff §3b) compares against. Both arrive healed (`fetchWeek`), so the
- * `contours` contract is one contract. The prior week is ADVISORY and a second
- * request, so the two fetches run concurrently and the prior one fails on its
- * own (a bare Promise.all reported "could not load" for a week whose bytes
- * downloaded perfectly). A prior week absent from the archive (only January
- * 2000) and one that failed both arrive as `previous: null`; the caller can
- * tell them apart with `priorWeek()` and should say so. The cache evicts a
+ * Everything the editor needs to open a week: the week itself, healed
+ * (`fetchWeek`), plus the manifest's record of the week BEFORE it for the
+ * package's provenance (`priorWeek`). Nothing is downloaded for the prior
+ * week: a proposal is the FOLLOWING week's map drawn from the published one,
+ * so the one-class-per-week norm is proposal vs the map being edited —
+ * `ruleOneClassMove`, a gate rule — and the week before that has nothing to
+ * say about it. (Until 2026-09-14 a second download fed a "change-magnitude"
+ * heuristic that compared the proposal with the prior week and so charged
+ * NDMC's own week-over-week change to the author.) The cache evicts a
  * rejected entry, so re-opening refetches rather than serving the failure back.
  */
 export async function openWeek(week, { manifest, cache = createWeekCache(), signal, onProgress } = {}) {
@@ -316,18 +375,9 @@ export async function openWeek(week, { manifest, cache = createWeekCache(), sign
   if (!mf.byWeek.has(week)) throw new Error(`[usdm/archive] ${week} is not in the archive`);
   const prior = priorWeek(mf.weeks, week);
   const shaOf = (w) => (w ? mf.byWeek.get(w)?.sha256 ?? null : null);
-
-  const [current, previous] = await Promise.all([
-    cache.get(week, { sha256: shaOf(week), signal, onProgress }),
-    prior
-      ? cache.get(prior, { sha256: shaOf(prior), signal }).catch((err) => {
-          console.warn('[usdm/archive] prior week unavailable', err);
-          return null;
-        })
-      : Promise.resolve(null),
-  ]);
+  const current = await cache.get(week, { sha256: shaOf(week), signal, onProgress });
   return {
-    manifest: mf, cache, current, previous,
+    manifest: mf, cache, current,
     baseline: { week, url: weekUrl(week), sha256: shaOf(week) },
     priorBaseline: prior ? { week: prior, url: weekUrl(prior), sha256: shaOf(prior) } : null,
   };

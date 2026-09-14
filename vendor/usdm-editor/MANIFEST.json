@@ -1,11 +1,11 @@
 {
   "source": "https://github.com/ngp-ridr/usdm-editor",
   "sourcePath": "../usdm-editor",
-  "commit": "a6620a50910a915b3a5dcee51df4789f56f3346c",
-  "commitSubject": "verifyPackage reads clipper residue as residue: 12 of 12 example proposals re-verify clean, and the wizard stops calling its own files hand-edited",
+  "commit": "3596c8232f1a61466350bc3b4bd5fd319133eea1",
+  "commitSubject": "A proposal is the FOLLOWING week's map: the one-class norm is the gate rule against the map being edited, and the prior-week \"change-magnitude\" check is gone",
   "dirty": false,
-  "syncedAt": "2026-09-13T05:41:42.383Z",
-  "count": 58,
+  "syncedAt": "2026-09-14T16:17:18.498Z",
+  "count": 57,
   "files": {
     "vendor/aoi/PROVENANCE.md": {
       "from": "vendor/aoi/PROVENANCE.md",
@@ -25,7 +25,7 @@
     },
     "vendor/usdm-editor/js/aoi.js": {
       "from": "js/aoi.js",
-      "sha256": "bb097ab1738eb98b7ce859933fb6ad35edb0d8999e801beaa8661d67e854dc03"
+      "sha256": "c6d706cd18187254bd9ab02277ab960e83b58f0f15ed25321673907526de0c71"
     },
     "vendor/usdm-editor/js/aois.js": {
       "from": "js/aois.js",
@@ -33,11 +33,11 @@
     },
     "vendor/usdm-editor/js/archive.js": {
       "from": "js/archive.js",
-      "sha256": "d8878a79d384273a0f968fcc85f700ff09ea8aac3b0768fde2a43a7a6f552a06"
+      "sha256": "2fc4bbbb923456325c264c3938ff414baf05bb437dbc8ca05967460513f5dfad"
     },
     "vendor/usdm-editor/js/basemap.js": {
       "from": "js/basemap.js",
-      "sha256": "bc4552445c43d0c79762f7d833f053995ca40bc61cc0af5fd7aa9f7816abc6ea"
+      "sha256": "4eaf18f79ab496c83a6ed5121e548f466ac8c9a974940ce9932e52880d53b3c7"
     },
     "vendor/usdm-editor/js/changes.js": {
       "from": "js/changes.js",
@@ -45,7 +45,7 @@
     },
     "vendor/usdm-editor/js/changeset.js": {
       "from": "js/changeset.js",
-      "sha256": "3b89b0cee7a3fc57f456b969148d5718d474a0866ba7b27de1e5ca2bd0614a19"
+      "sha256": "f135c355fbe8c9ba45076a40e340bc4dc2aad4d62598d196ab98ea7365c38a1e"
     },
     "vendor/usdm-editor/js/color.js": {
       "from": "js/color.js",
@@ -53,7 +53,7 @@
     },
     "vendor/usdm-editor/js/delta.js": {
       "from": "js/delta.js",
-      "sha256": "e25963ce5e12db39dd1fc794bf4bbe86ea93da26a8475c3a19c7c42a263ff46a"
+      "sha256": "8615d32a18c8bc017a0111351a2786f18bb1190edf732f53f3fa7dc2e5674b87"
     },
     "vendor/usdm-editor/js/dom.js": {
       "from": "js/dom.js",
@@ -67,37 +67,33 @@
       "from": "js/gzip.js",
       "sha256": "149306da1b472c7f68f3186e8e90566a7e068e5d97641bd32605e7958c4d3a30"
     },
-    "vendor/usdm-editor/js/heuristic.js": {
-      "from": "js/heuristic.js",
-      "sha256": "e050d7c6f84575b9cb2f7f7184103f6e90e2fd56e14b1522f45971c4c84d4837"
-    },
     "vendor/usdm-editor/js/image.js": {
       "from": "js/image.js",
       "sha256": "b15f9d0525c455524fc995ad6f9aba714fc8b9f5d00dec56726fb7325837114d"
     },
     "vendor/usdm-editor/js/justify.js": {
       "from": "js/justify.js",
-      "sha256": "cd0a1426fd35cda76dd14dc20e7be2056ab08c487db14dd0e3af4b90cc34303f"
+      "sha256": "4f90983d7ee387be59e56de7c60a643b87d97820c33b5cb54af9056a18b4271b"
     },
     "vendor/usdm-editor/js/layers.js": {
       "from": "js/layers.js",
-      "sha256": "2fd9b6637e9bcced54188779e438e7702d3a63237c0e200c8fc3bf28433e48cd"
+      "sha256": "1d80d50ca244966da9f87128f0171d4cce22c5530d30935c7960e47742c6f71d"
     },
     "vendor/usdm-editor/js/mdtext.js": {
       "from": "js/mdtext.js",
-      "sha256": "6ccf6004d8ffdeede2bd79b430f21f390a4bac7db5e914b96c21aa86a41ff652"
+      "sha256": "489def643ad9e715bf33599c92f22a0d0967292ac3882603ef8f7bf602812578"
     },
     "vendor/usdm-editor/js/submit.js": {
       "from": "js/submit.js",
-      "sha256": "dae1c45c8a7bb66c118da23256c6af75b47860aa89641c86a8a94de2390812ae"
+      "sha256": "11ee6208d7d8229064111ed1c485028f7fe8bb9f78f639c1c346bc3ad24216f2"
     },
     "vendor/usdm-editor/js/topology.js": {
       "from": "js/topology.js",
-      "sha256": "186e8376d6c086c23e56443f37d46447614d655c3f7c6a66d56dbed7224cc56b"
+      "sha256": "d17e70698db83c724f411264a460e8d3ab3fa076e7e33642187585c62fba93e3"
     },
     "vendor/usdm-editor/js/units.js": {
       "from": "js/units.js",
-      "sha256": "705ab1e52d0e55bf9b1810d83db205755272ec45ab2c9761a2c679cca3e78493"
+      "sha256": "df8c7fb23cc81c00723a46c50cbc2d0f23721e3447856767f6f95d25241fb6c8"
     },
     "vendor/usdm-editor/vendor/VENDORED.md": {
       "from": "vendor/VENDORED.md",
@@ -161,7 +157,7 @@
     },
     "vendor/usdm-editor/vendor/style/PROVENANCE.md": {
       "from": "vendor/style/PROVENANCE.md",
-      "sha256": "801fc3eddf3175be8250bfe7f3d49a1fe3f8babe160f0431882f943e36b7134b"
+      "sha256": "36e7c2e1f8f37c2ddbf0c5ce6a3a0b20bc54f191aaec7c395554f39b7ce63562"
     },
     "vendor/usdm-editor/vendor/style/core/core.js": {
       "from": "vendor/style/core/core.js",
@@ -189,7 +185,7 @@
     },
     "vendor/usdm-editor/vendor/style/theme/ridr-theme.css": {
       "from": "vendor/style/theme/ridr-theme.css",
-      "sha256": "e88f4b03f1646f9e98bc7ca2a3a232fe99f7337cc20ab83a2cc86919a2f4d903"
+      "sha256": "95086752dd7d99b0c783a0e3d8e32beefccdbe07a09c2d5fb40af83f247425c0"
     },
     "vendor/usdm-editor/vendor/style/ui/card.js": {
       "from": "vendor/style/ui/card.js",

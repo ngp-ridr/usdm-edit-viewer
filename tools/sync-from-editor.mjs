@@ -87,10 +87,13 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
    import closure will say so, by name, the moment you forget.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/** The 19 editor modules the viewer reads. Order is documentation, not load. */
+/** The 18 editor modules the viewer reads. Order is documentation, not load.
+    (`heuristic.js` was the 19th until the editor deleted it on 2026-09-14: a
+    proposal is the FOLLOWING week's map, so the one-class norm is the gate
+    rule, not a comparison against the week before.) */
 const EDITOR_MODULES = [
   /* the DOM-free engine */
-  'topology.js', 'changeset.js', 'changes.js', 'delta.js', 'geojson.js', 'heuristic.js',
+  'topology.js', 'changeset.js', 'changes.js', 'delta.js', 'geojson.js',
   /* vocabularies and leaves */
   'color.js', 'units.js', 'gzip.js', 'dom.js', 'image.js',
   /* data + packaging */

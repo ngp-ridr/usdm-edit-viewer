@@ -54,6 +54,22 @@ ladder, breakpoint ladder and component anatomy come from there.
    app layout cannot see them. An addition rather than a change, like
    `--map-dim` above: a future upstream merge sees a new declaration.
 
+8. **High contrast's `--selection-ring` is a navy, not ink.** Upstream (and
+   this fork until 2026-09-13) resolved it to `#000000` in the
+   `[data-theme="high-contrast"]` block, on the theme's general rule that
+   everything darkens toward ink. That rule is wrong for this one token in an
+   app whose map carries five different line marks: `--text-primary` (the
+   working-area dash and the change outlines) and `--map-reach-line` are
+   already dark, so an ink selection ring left "the thing you picked", "the
+   scope" and "a change" separated by dash and width alone — and the ring is
+   the heaviest of them, drawn on every editable boundary. It is now
+   `#1a357f`, which still moves in the theme's own direction (11.29:1 on white
+   against the light theme's 9.28 for `#1f3f9e`) while staying visibly blue.
+   The white casing under it is unchanged at `--selection-casing: 1.5px`,
+   which is what carries the mark over a dark D4 fill. A change rather than an
+   addition, so a future upstream merge sees a modified declaration; the light
+   block is untouched.
+
 Everything else — `core/`, `map/`, `ui/`, `county/`, `snippets/` — is upstream
 logic with only the namespace rename applied.
 
