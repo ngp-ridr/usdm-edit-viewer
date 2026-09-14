@@ -231,6 +231,15 @@ rather than on somebody's pan.
 ?view=          published | differences
 ?pick=          <shortId>            8 hex of pkg.id, 12 on collision
 ?show=          <shortId>,…          emitted only when not all are shown
+?proposal=      <shortId>            a proposal's card open (a Details click); reopened at boot
+?change=        <patchKey>           a change's card open; reopened at boot
+                `?focus=` is emitted ONLY for `disc:` / `seam:` findings — a
+                proposal or change selection never writes it (the app used
+                to emit ids it then refused on reload). A stale ?pick= /
+                ?show= / ?proposal= / ?change= / ?focus= adds one clause to
+                ONE toast naming what it ignored; a ?load= that loaded
+                nothing, or is empty, is scrubbed; a successful ?load= keeps
+                its literal `/` and `,` (`readableSeparators()`).
 ?focus=         <findingId>          disc:<8 hex> or seam:<8 hex> — docs/contracts.md § 8
 ?theme=light    high-contrast is the DEFAULT and this is the only route back;
                 the anti-flash boot reads the URL and nothing else
@@ -283,6 +292,62 @@ reference proposals as suspect has told the reader nothing.
   drawer and an open card are swept together (the editor's § 9f rule).
 - Real `<label for>` on every control that has a visible label; `aria-pressed`
   on the three view segments alone.
+
+## What the 2026-09-13 audit pinned (each was a filed issue; the commit is the detail)
+
+- **Finding ids name the sorted proposal pair** (`disc|kind|aoi|propLo|propHi|
+  lo|hi|published|bbox@1e-3`). Without the pair, the same ground answered the
+  same way by two partners collided by construction — 188 findings carried
+  146 ids and 42 wore a rank-assigned suffix, and the suffix broke the brief's
+  lookup (22 % of the demo downloaded "an unnamed author"). A true hash
+  collision widens both sides to twelve hex FROM THEIR KEYS, never from rank
+  or load order; `?demo` and a reversed `?load=` give identical ids.
+- **The brief finds its comparison by the pair**, never by an id; the session
+  brief gets the same `viewerUrl` the single brief does and builds its index
+  from the session's RESOLVED, RANKED findings (376 `focus=` links = 2 × 188).
+- **The sweep yields per PAIR, not per group** — `recompare` walks
+  `groupPairs()` with `await tick()` between pairs (median click→frame
+  mid-sweep 274 → 147 ms; the floor is one `compareProposals`). The intake
+  fetches file N+1 while ingesting N (inter-request gap +8 ms → −396 ms);
+  load order, and therefore the letters, unchanged.
+- **Seam runs are drawn along the border's own vertices** (`Run.geometry`;
+  35 on the SD/NE line where the chord had 2) and hit-tested there;
+  `seamUnder` is bbox-gated first.
+- **Unticking the last proposal is refused with a sentence**; the box springs
+  back. Hiding everything would need a third state the map, `isShown`, the
+  dimming and `?show=` would all have to learn, for something the Published
+  view already gives. The panel passes `{ids, all}`; `setShown` also takes
+  the legacy array (empty = all) and `null`.
+- **A dimmed row stays ≥ 4.5:1** — three channels (fill `--bg-surface`, dashed
+  border, ink `--text-dim`; 12.6:1 measured) plus a visually-hidden "(its
+  proposal is hidden)"; never `opacity`, which measured 3.98:1 on operable
+  rows.
+- **The re-check grade is GEOMETRIC.** `verifyPackage`'s completeness problems
+  (no rationale, no author) are partitioned into `completeness` with one
+  reader-facing sentence; the editor's authoring imperatives never reach a
+  reviewer, and an empty justification is not a "defect".
+- **An unread far side is "not known"** in list, card and brief — never `null`,
+  never "none", which here means no drought. `Seam.sharedKm` (true border) is
+  carried beside `lengthKm` (the analysed line): "of M mi analysed" when the
+  neighbour is unloaded. Seam rows name both authors.
+- **Live-region hygiene:** one channel per sentence (`#app-note` is itself
+  `role=status`, so `recompare` no longer mirrors into `live()`); load
+  progress speaks at quarters without filenames; the proposal card announces
+  itself; the re-check verdict is announced once when its queue drains;
+  errors use `role=alert`, never `role=status` + `aria-live=assertive`.
+- **Chrome:** the attribution rides the kit's own sheet padding (the app's
+  `bottom:` override was a DOUBLE lift — deleted); the compact drawer closes
+  when a row opens its sheet; the drop hint sits above the empty state and
+  dims chrome, not the map; Briefs and the view segments are HIDDEN until
+  something loads (omit, don't disable); the drawer reads What differs →
+  Legend → Proposals; finding cards are one column; legend marks are grouped
+  by working area with the letter in the swatch and the proposal-marks block
+  is absent in Differences (its layers are); the editor-only `band-*`
+  layers/sources are removed right after `addAll()` (the vendored copy is
+  never edited). `kit-override count: 2` — the toast lifted above the footer,
+  and a `*`-scoped reduced-motion rule the kit's transitions need.
+- **The camera honours `prefers-reduced-motion`** (`animate: !prefersReducedMotion()`
+  in `focus()`, read per call).
 
 ## Before you push
 

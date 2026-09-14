@@ -73,6 +73,13 @@ marks is a row there, in the same order, with the same words. A screen reader
 cannot see a WebGL canvas, so the list is not a summary of the map — it is the
 map.
 
+Two rules the drawer keeps: at least one proposal stays ticked (untick the
+last and it springs back — for the week with nothing drawn over it, use the
+Published view), and a **dimmed** row means one of its proposals is hidden;
+the finding is still there and still opens. The drawer reads What differs →
+Legend → Proposals, and the Briefs button and the view segments appear once
+something is loaded.
+
 ## Briefs
 
 Every finding can be downloaded or copied as a **markdown discussion brief**:
@@ -86,6 +93,11 @@ integrity table, the ranked index, a "Not compared" section, then every brief.
 
 Areas are in **square miles** everywhere a person reads one. The JSON keys stay
 metric, under names that say so.
+
+A link can also open a proposal's or a change's card directly —
+`?proposal=<shortId>` and `?change=<patchKey>` — and `?focus=` is reserved for
+findings (`disc:` / `seam:`); a link that names something the loaded set does
+not contain says so in one toast rather than silently showing something else.
 
 ## Layout
 
